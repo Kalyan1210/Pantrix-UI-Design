@@ -250,20 +250,29 @@ export default function App() {
           @keyframes fadeInSpring {
             0% {
               opacity: 0;
-              transform: scale(0.3);
+              transform: scale(0.3) rotate(0deg);
             }
             100% {
               opacity: 1;
-              transform: scale(1);
+              transform: scale(1) rotate(0deg);
             }
           }
           
-          @keyframes pulse {
-            0%, 100% {
-              transform: scale(1);
+          @keyframes gentleSpinPulse {
+            0% {
+              transform: scale(1) rotate(0deg);
+            }
+            25% {
+              transform: scale(1.05) rotate(90deg);
             }
             50% {
-              transform: scale(1.1);
+              transform: scale(1.1) rotate(180deg);
+            }
+            75% {
+              transform: scale(1.05) rotate(270deg);
+            }
+            100% {
+              transform: scale(1) rotate(360deg);
             }
           }
           
@@ -277,9 +286,9 @@ export default function App() {
           }
           
           .emoji-loading {
-            font-size: 120px;
+            font-size: 160px;
             animation: fadeInSpring 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards, 
-                       pulse 2s ease-in-out 0.6s infinite;
+                       gentleSpinPulse 4s ease-in-out 0.6s infinite;
           }
           
           .text-loading {
