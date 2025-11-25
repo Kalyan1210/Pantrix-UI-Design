@@ -246,9 +246,48 @@ export default function App() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
+        <style>{`
+          @keyframes fadeInScale {
+            0% {
+              opacity: 0;
+              transform: scale(0.3);
+            }
+            100% {
+              opacity: 1;
+              transform: scale(1);
+            }
+          }
+          
+          @keyframes pulse {
+            0%, 100% {
+              transform: scale(1);
+            }
+            50% {
+              transform: scale(1.1);
+            }
+          }
+          
+          @keyframes fadeIn {
+            0% {
+              opacity: 0;
+            }
+            100% {
+              opacity: 1;
+            }
+          }
+          
+          .emoji-loading {
+            animation: fadeInScale 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55), 
+                       pulse 2s ease-in-out infinite;
+          }
+          
+          .text-loading {
+            animation: fadeIn 0.6s ease-out;
+          }
+        `}</style>
         <div className="flex flex-col items-center gap-4">
-          <div className="text-8xl mb-4 animate-pulse">🥗</div>
-          <h1 className="text-4xl font-semibold text-foreground mb-8">Pantrix</h1>
+          <div className="text-8xl mb-4 emoji-loading">🥗</div>
+          <h1 className="text-4xl font-semibold text-foreground mb-8 text-loading">Pantrix</h1>
           <Loader2 className="w-10 h-10 animate-spin text-primary" />
         </div>
       </div>
