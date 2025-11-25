@@ -247,23 +247,32 @@ export default function App() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <style>{`
-          @keyframes fadeInScale {
+          @keyframes fadeInSpin {
             0% {
               opacity: 0;
-              transform: scale(0.3);
+              transform: scale(0.3) rotate(0deg);
             }
             100% {
               opacity: 1;
-              transform: scale(1);
+              transform: scale(1) rotate(360deg);
             }
           }
           
-          @keyframes pulse {
-            0%, 100% {
-              transform: scale(1);
+          @keyframes spinPulse {
+            0% {
+              transform: rotate(0deg) scale(1);
+            }
+            25% {
+              transform: rotate(90deg) scale(1.1);
             }
             50% {
-              transform: scale(1.1);
+              transform: rotate(180deg) scale(1);
+            }
+            75% {
+              transform: rotate(270deg) scale(1.1);
+            }
+            100% {
+              transform: rotate(360deg) scale(1);
             }
           }
           
@@ -277,12 +286,13 @@ export default function App() {
           }
           
           .emoji-loading {
-            animation: fadeInScale 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55), 
-                       pulse 2s ease-in-out infinite;
+            animation: fadeInSpin 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards, 
+                       spinPulse 3s ease-in-out 0.8s infinite;
           }
           
           .text-loading {
-            animation: fadeIn 0.6s ease-out;
+            animation: fadeIn 0.6s ease-out 0.3s forwards;
+            opacity: 0;
           }
         `}</style>
         <div className="flex flex-col items-center gap-4">
