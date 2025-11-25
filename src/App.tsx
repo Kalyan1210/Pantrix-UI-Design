@@ -247,32 +247,23 @@ export default function App() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <style>{`
-          @keyframes fadeInSpin {
+          @keyframes fadeInSpring {
             0% {
               opacity: 0;
-              transform: scale(0.3) rotate(0deg);
+              transform: scale(0.3);
             }
             100% {
               opacity: 1;
-              transform: scale(1) rotate(360deg);
+              transform: scale(1);
             }
           }
           
-          @keyframes spinPulse {
-            0% {
-              transform: rotate(0deg) scale(1);
-            }
-            25% {
-              transform: rotate(90deg) scale(1.1);
+          @keyframes pulse {
+            0%, 100% {
+              transform: scale(1);
             }
             50% {
-              transform: rotate(180deg) scale(1);
-            }
-            75% {
-              transform: rotate(270deg) scale(1.1);
-            }
-            100% {
-              transform: rotate(360deg) scale(1);
+              transform: scale(1.1);
             }
           }
           
@@ -286,17 +277,17 @@ export default function App() {
           }
           
           .emoji-loading {
-            animation: fadeInSpin 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards, 
-                       spinPulse 3s ease-in-out 0.8s infinite;
+            font-size: 120px;
+            animation: fadeInSpring 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards, 
+                       pulse 2s ease-in-out 0.6s infinite;
           }
           
           .text-loading {
-            animation: fadeIn 0.6s ease-out 0.3s forwards;
-            opacity: 0;
+            animation: fadeIn 0.6s ease-out forwards;
           }
         `}</style>
         <div className="flex flex-col items-center gap-4">
-          <div className="text-8xl mb-4 emoji-loading">🥗</div>
+          <div className="mb-4 emoji-loading">🥗</div>
           <h1 className="text-4xl font-semibold text-foreground mb-8 text-loading">Pantrix</h1>
           <Loader2 className="w-10 h-10 animate-spin text-primary" />
         </div>
