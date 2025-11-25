@@ -3,6 +3,7 @@ import { WelcomeScreen } from "./components/WelcomeScreen";
 import { LoginScreen } from "./components/LoginScreen";
 import { SignUpScreen } from "./components/SignUpScreen";
 import { OnboardingScreen } from "./components/OnboardingScreen";
+import { OnboardingCarousel } from "./components/OnboardingCarousel";
 import { HomeScreen } from "./components/HomeScreen";
 import { InventoryScreen } from "./components/InventoryScreen";
 import { ItemDetailScreen } from "./components/ItemDetailScreen";
@@ -172,7 +173,7 @@ export default function App() {
     }
 
     if (currentScreen === 'onboarding') {
-      return <OnboardingScreen onComplete={handleOnboardingComplete} />;
+      return <OnboardingCarousel onComplete={handleOnboardingComplete} />;
     }
 
     switch (currentScreen) {
@@ -246,8 +247,9 @@ export default function App() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Loading...</p>
+          <div className="text-8xl mb-4 animate-pulse">🥗</div>
+          <h1 className="text-4xl font-semibold text-foreground mb-8">Pantrix</h1>
+          <Loader2 className="w-10 h-10 animate-spin text-primary" />
         </div>
       </div>
     );

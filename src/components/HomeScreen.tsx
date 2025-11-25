@@ -150,13 +150,17 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2>Recent Activity</h2>
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" onClick={() => onNavigate('inventory')}>
             See all
           </Button>
         </div>
         <Card className="divide-y">
           {recentActivity.map((activity, index) => (
-            <div key={index} className="p-4 flex items-start gap-3 hover:bg-muted/50 transition-colors">
+            <button
+              key={index}
+              onClick={() => onNavigate('inventory')}
+              className="w-full p-4 flex items-start gap-3 hover:bg-muted/50 transition-colors text-left"
+            >
               <div className="flex-1">
                 <p className="mb-1">{activity.action}</p>
                 <p className="text-muted-foreground">{activity.detail}</p>
@@ -165,7 +169,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
                 <span className="text-xs text-muted-foreground">{activity.time}</span>
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </div>
-            </div>
+            </button>
           ))}
         </Card>
       </div>

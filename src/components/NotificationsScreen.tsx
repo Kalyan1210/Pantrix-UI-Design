@@ -1,3 +1,4 @@
+import * as React from "react";
 import { ArrowLeft, AlertCircle, ShoppingCart, Users, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -17,7 +18,7 @@ interface Notification {
 }
 
 export function NotificationsScreen({ onBack }: NotificationsScreenProps) {
-  const notifications: Notification[] = [
+  const [notifications, setNotifications] = React.useState<Notification[]>([
     {
       id: '1',
       type: 'spoilage',
@@ -58,7 +59,15 @@ export function NotificationsScreen({ onBack }: NotificationsScreenProps) {
       time: '2 days ago',
       read: true,
     },
-  ];
+  ]);
+
+  const markAllAsRead = () => {
+    setNotifications(notifications.map(n => ({ ...n, read: true })));
+  };
+
+  const deleteNotification = (id: string) => {
+    setNotifications(notifications.filter(n => n.id !== id));
+  };
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -100,7 +109,15 @@ export function NotificationsScreen({ onBack }: NotificationsScreenProps) {
           <p className="text-muted-foreground mb-1">{notification.message}</p>
           <span className="text-xs text-muted-foreground">{notification.time}</span>
         </div>
-        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="text-muted-foreground hover:text-destructive"
+          onClick={(e) => {
+            e.stopPropagation();
+            deleteNotification(notification.id);
+          }}
+        >
           <Trash2 className="w-4 h-4" />
         </Button>
       </div>
@@ -117,7 +134,7 @@ export function NotificationsScreen({ onBack }: NotificationsScreenProps) {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className="text-xl flex-1">Notifications</h1>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" onClick={markAllAsRead}>
               Mark all read
             </Button>
           </div>

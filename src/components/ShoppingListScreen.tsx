@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Share2, SlidersHorizontal, Users } from "lucide-react";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
@@ -21,15 +21,33 @@ interface ShoppingItem {
 }
 
 export function ShoppingListScreen({ onAddItem }: ShoppingListScreenProps) {
-  const [items, setItems] = useState<ShoppingItem[]>([
-    { id: '1', name: 'Milk', quantity: 1, category: 'Dairy', priority: 'urgent', reason: 'expiring', completed: false },
-    { id: '2', name: 'Strawberries', quantity: 1, category: 'Produce', priority: 'urgent', reason: 'expiring', completed: false },
-    { id: '3', name: 'Eggs', quantity: 12, category: 'Dairy', priority: 'normal', reason: 'low', completed: false },
-    { id: '4', name: 'Bread', quantity: 1, category: 'Bakery', priority: 'normal', reason: 'low', completed: false },
-    { id: '5', name: 'Chicken Breast', quantity: 2, category: 'Meat', priority: 'normal', reason: 'manual', completed: true },
-    { id: '6', name: 'Lettuce', quantity: 1, category: 'Produce', priority: 'normal', reason: 'manual', completed: false },
-    { id: '7', name: 'Yogurt', quantity: 4, category: 'Dairy', priority: 'urgent', reason: 'low', completed: false },
-  ]);
+  // Load initial items from localStorage or use default
+  const loadItemsFromStorage = () => {
+    const saved = localStorage.getItem('shopping_list_items');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error loading shopping list:', e);
+      }
+    }
+    return [
+      { id: '1', name: 'Milk', quantity: 1, category: 'Dairy', priority: 'urgent', reason: 'expiring', completed: false },
+      { id: '2', name: 'Strawberries', quantity: 1, category: 'Produce', priority: 'urgent', reason: 'expiring', completed: false },
+      { id: '3', name: 'Eggs', quantity: 12, category: 'Dairy', priority: 'normal', reason: 'low', completed: false },
+      { id: '4', name: 'Bread', quantity: 1, category: 'Bakery', priority: 'normal', reason: 'low', completed: false },
+      { id: '5', name: 'Chicken Breast', quantity: 2, category: 'Meat', priority: 'normal', reason: 'manual', completed: true },
+      { id: '6', name: 'Lettuce', quantity: 1, category: 'Produce', priority: 'normal', reason: 'manual', completed: false },
+      { id: '7', name: 'Yogurt', quantity: 4, category: 'Dairy', priority: 'urgent', reason: 'low', completed: false },
+    ];
+  };
+
+  const [items, setItems] = useState<ShoppingItem[]>(loadItemsFromStorage);
+
+  // Save to localStorage whenever items change
+  useEffect(() => {
+    localStorage.setItem('shopping_list_items', JSON.stringify(items));
+  }, [items]);
 
   const toggleItem = (id: string) => {
     setItems(items.map(item => 
