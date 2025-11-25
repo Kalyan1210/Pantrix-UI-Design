@@ -84,7 +84,7 @@ export async function parseReceipt(imageBase64: string): Promise<{
     }
 
     const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-3-5-sonnet-20240620',
       max_tokens: 4096,
       messages: [
         {
@@ -152,7 +152,7 @@ export async function parseProduct(imageBase64: string): Promise<{
     }
 
     const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-3-5-sonnet-20240620',
       max_tokens: 2048,
       messages: [
         {
@@ -257,7 +257,7 @@ export async function analyzeImage(imageBase64: string): Promise<{
 
     // First, detect what type of image it is
     const detectionPromise = anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-3-5-sonnet-20240620',
       max_tokens: 512,
       messages: [
         {

@@ -32,7 +32,7 @@ app.post('/api/analyze-image', async (req, res) => {
 
     // Detect image type
     const detectionMessage = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-3-5-sonnet-20240620',
       max_tokens: 512,
       messages: [
         {
@@ -76,7 +76,7 @@ Be accurate - receipts have multiple items listed, totals, store names. Products
     // Parse based on type
     if (imageType === 'receipt') {
       const receiptMessage = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-3-5-sonnet-20240620',
         max_tokens: 4096,
         messages: [
           {
@@ -128,7 +128,7 @@ Be thorough and extract all items.`,
       }
     } else {
       const productMessage = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-3-5-sonnet-20240620',
         max_tokens: 2048,
         messages: [
           {
