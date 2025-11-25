@@ -3,23 +3,61 @@ import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Alert, AlertDescription } from "./ui/alert";
+import { useState, useEffect } from "react";
+import { getInventoryItems, calculateDaysUntilExpiry } from "../lib/inventory";
+import { getCurrentUser } from "../lib/auth";
 
 interface HomeScreenProps {
-  onNavigate: (screen: string) => void;
+  onNavigate: (screen: string, filter?: string) => void;
 }
 
 export function HomeScreen({ onNavigate }: HomeScreenProps) {
-  const stats = [
-    { label: 'Expiring Today', value: 3, icon: AlertCircle, color: 'text-destructive', bgColor: 'bg-destructive/10' },
-    { label: 'Running Low', value: 7, icon: TrendingDown, color: 'text-secondary', bgColor: 'bg-secondary/10' },
-    { label: 'Total Items', value: 42, icon: Package, color: 'text-primary', bgColor: 'bg-primary/10' },
-  ];
+  const [stats, setStats] = useState([
+    { label: 'Expiring Today', value: 0, icon: AlertCircle, color: 'text-destructive', bgColor: 'bg-destructive/10', filter: 'expiring' },
+    { label: 'Running Low', value: 0, icon: TrendingDown, color: 'text-secondary', bgColor: 'bg-secondary/10', filter: 'low' },
+    { label: 'Total Items', value: 0, icon: Package, color: 'text-primary', bgColor: 'bg-primary/10', filter: 'all' },
+  ]);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const user = await getCurrentUser();
+        if (!user) return;
+
+        const items = await getInventoryItems(user.id, (user as any).user_id);
+        
+        // Calculate expiring today (0 days or less)
+        const expiringToday = items.filter(item => {
+          const days = calculateDaysUntilExpiry(item.expiry_date);
+          return days !== null && days <= 0;
+        }).length;
+
+        // Calculate running low (quantity <= 2)
+        const runningLow = items.filter(item => item.quantity <= 2).length;
+
+        setStats([
+          { label: 'Expiring Today', value: expiringToday, icon: AlertCircle, color: 'text-destructive', bgColor: 'bg-destructive/10', filter: 'expiring' },
+          { label: 'Running Low', value: runningLow, icon: TrendingDown, color: 'text-secondary', bgColor: 'bg-secondary/10', filter: 'low' },
+          { label: 'Total Items', value: items.length, icon: Package, color: 'text-primary', bgColor: 'bg-primary/10', filter: 'all' },
+        ]);
+      } catch (error) {
+        console.error('Error loading stats:', error);
+      }
+    };
+
+    loadStats();
+  }, []);
 
   const recentActivity = [
     { action: 'Added 3 items', detail: 'From receipt scan', time: '2 hours ago' },
     { action: 'Sarah added milk', detail: 'To shopping list', time: '3 hours ago' },
     { action: '2 items expiring soon', detail: 'Strawberries, Yogurt', time: '5 hours ago' },
   ];
+
+  const handleStatClick = (filter: string) => {
+    // Navigate to inventory with the filter applied
+    onNavigate('inventory', filter);
+  };
 
   return (
     <div className="pb-24 px-4 pt-6 max-w-md mx-auto">
@@ -43,27 +81,33 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       </div>
 
       {/* Urgent Alert */}
-      <Alert className="mb-6 border-destructive/50 bg-destructive/5">
-        <AlertCircle className="h-5 w-5 text-destructive" />
-        <AlertDescription className="ml-2">
-          <span className="font-medium">3 items expiring today</span> - Check your inventory to avoid waste
-        </AlertDescription>
-        <Button 
-          size="sm" 
-          variant="ghost" 
-          className="ml-auto text-destructive hover:text-destructive"
-          onClick={() => onNavigate('inventory')}
-        >
-          View
-        </Button>
-      </Alert>
+      {stats[0].value > 0 && (
+        <Alert className="mb-6 border-destructive/50 bg-destructive/5">
+          <AlertCircle className="h-5 w-5 text-destructive" />
+          <AlertDescription className="ml-2">
+            <span className="font-medium">{stats[0].value} items expiring today</span> - Check your inventory to avoid waste
+          </AlertDescription>
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            className="ml-auto text-destructive hover:text-destructive"
+            onClick={() => onNavigate('inventory', 'expiring')}
+          >
+            View
+          </Button>
+        </Alert>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-3 gap-3 mb-6">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <Card key={index} className="p-4 text-center">
+            <Card 
+              key={index} 
+              className="p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => handleStatClick(stat.filter)}
+            >
               <div className={`w-10 h-10 rounded-lg ${stat.bgColor} mx-auto mb-2 flex items-center justify-center`}>
                 <Icon className={`w-5 h-5 ${stat.color}`} />
               </div>
@@ -86,7 +130,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
             <span className="text-sm">Scan Receipt</span>
           </button>
           <button
-            onClick={() => onNavigate('inventory')}
+            onClick={() => onNavigate('addItem')}
             className="flex flex-col items-center justify-center p-4 rounded-xl bg-accent/10 hover:bg-accent/20 transition-colors"
           >
             <Plus className="w-6 h-6 text-accent mb-2" />

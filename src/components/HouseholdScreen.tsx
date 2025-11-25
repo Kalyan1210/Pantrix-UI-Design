@@ -10,12 +10,14 @@ interface HouseholdScreenProps {
 }
 
 export function HouseholdScreen({ onBack }: HouseholdScreenProps) {
-  const members = [
-    { id: '1', name: 'John Doe', email: 'john.doe@email.com', role: 'admin', initials: 'JD' },
-    { id: '2', name: 'Sarah Doe', email: 'sarah.doe@email.com', role: 'member', initials: 'SD' },
-    { id: '3', name: 'Mike Johnson', email: 'mike.j@email.com', role: 'member', initials: 'MJ' },
-    { id: '4', name: 'Emma Wilson', email: 'emma.w@email.com', role: 'member', initials: 'EW' },
-  ];
+  // Empty state - no members added yet
+  const members: Array<{
+    id: string;
+    name: string;
+    email: string;
+    role: 'admin' | 'member';
+    initials: string;
+  }> = [];
 
   const inviteCode = "PANTRIX-2024";
 
@@ -42,8 +44,8 @@ export function HouseholdScreen({ onBack }: HouseholdScreenProps) {
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
             <span className="text-3xl">🏠</span>
           </div>
-          <h2 className="mb-1">The Doe Family</h2>
-          <p className="text-muted-foreground">{members.length} members</p>
+          <h2 className="mb-1">My Household</h2>
+          <p className="text-muted-foreground">{members.length === 0 ? 'No members yet' : `${members.length} ${members.length === 1 ? 'member' : 'members'}`}</p>
         </Card>
 
         {/* Invite Section */}
@@ -77,53 +79,46 @@ export function HouseholdScreen({ onBack }: HouseholdScreenProps) {
         {/* Members List */}
         <div>
           <h3 className="mb-3">Members</h3>
-          <Card className="divide-y">
-            {members.map((member) => (
-              <div key={member.id} className="p-4 flex items-center gap-4">
-                <Avatar className="w-12 h-12">
-                  <AvatarFallback className={member.role === 'admin' ? 'bg-primary text-primary-foreground' : 'bg-muted'}>
-                    {member.initials}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="truncate">{member.name}</p>
-                    {member.role === 'admin' && (
-                      <Badge variant="outline" className="gap-1">
-                        <Crown className="w-3 h-3" />
-                        Admin
-                      </Badge>
-                    )}
+          {members.length === 0 ? (
+            <Card className="p-8 text-center">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                <User className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <p className="text-muted-foreground mb-4">No household members yet</p>
+              <p className="text-sm text-muted-foreground">
+                Share the invite code above to add family members or roommates to your household
+              </p>
+            </Card>
+          ) : (
+            <Card className="divide-y">
+              {members.map((member) => (
+                <div key={member.id} className="p-4 flex items-center gap-4">
+                  <Avatar className="w-12 h-12">
+                    <AvatarFallback className={member.role === 'admin' ? 'bg-primary text-primary-foreground' : 'bg-muted'}>
+                      {member.initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="truncate">{member.name}</p>
+                      {member.role === 'admin' && (
+                        <Badge variant="outline" className="gap-1">
+                          <Crown className="w-3 h-3" />
+                          Admin
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-muted-foreground truncate">{member.email}</p>
                   </div>
-                  <p className="text-muted-foreground truncate">{member.email}</p>
+                  {member.role !== 'admin' && (
+                    <Button variant="ghost" size="sm" className="text-destructive">
+                      Remove
+                    </Button>
+                  )}
                 </div>
-                {member.role !== 'admin' && (
-                  <Button variant="ghost" size="sm" className="text-destructive">
-                    Remove
-                  </Button>
-                )}
-              </div>
-            ))}
-          </Card>
-        </div>
-
-        {/* Pending Invitations */}
-        <div className="mt-6">
-          <h3 className="mb-3">Pending Invitations</h3>
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                <UserPlus className="w-6 h-6 text-muted-foreground" />
-              </div>
-              <div className="flex-1">
-                <p>alex.smith@email.com</p>
-                <p className="text-muted-foreground">Invited 2 days ago</p>
-              </div>
-              <Button variant="ghost" size="sm" className="text-destructive">
-                Cancel
-              </Button>
-            </div>
-          </Card>
+              ))}
+            </Card>
+          )}
         </div>
 
         <Separator className="my-6" />

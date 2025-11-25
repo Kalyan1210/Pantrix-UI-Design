@@ -1,10 +1,17 @@
 import { ChevronRight, User, Users, Bell, Settings as SettingsIcon, HelpCircle, LogOut, Moon, Sun } from "lucide-react";
 import { Card } from "./ui/card";
 import { Switch } from "./ui/switch";
-import { Avatar, AvatarFallback } from "./ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getCurrentUser } from "../lib/auth";
+import { signOut } from "../lib/auth";
+import { getUserPreferences, updateUserPreferences } from "../lib/preferences";
+import { ProfileEditModal } from "./ProfileEditModal";
+import { SpoilageAlertModal } from "./SpoilageAlertModal";
+import { SupportModal } from "./SupportModal";
+import { toast } from "sonner";
 
 interface SettingsScreenProps {
   onNavigateToHousehold: () => void;
@@ -14,10 +21,107 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
   const [darkMode, setDarkMode] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(false);
+  const [userName, setUserName] = useState("User");
+  const [userEmail, setUserEmail] = useState("");
+  const [userInitials, setUserInitials] = useState("U");
+  const [userPhotoUrl, setUserPhotoUrl] = useState<string | undefined>();
+  const [userId, setUserId] = useState<string>("");
+  const [spoilageAlertDays, setSpoilageAlertDays] = useState(3);
+  
+  // Modal states
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isSpoilageModalOpen, setIsSpoilageModalOpen] = useState(false);
+  const [supportModalType, setSupportModalType] = useState<'help' | 'about' | null>(null);
 
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    const user = await getCurrentUser();
+    if (user) {
+      setUserEmail(user.email || "");
+      setUserId((user as any).user_id || user.id);
+      
+      // Get name from display_name or user_metadata
+      const name = (user as any).display_name || user.user_metadata?.name || user.email?.split('@')[0] || "User";
+      setUserName(name);
+      
+      // Get profile photo if available
+      const photoUrl = (user as any).profile_photo_url;
+      setUserPhotoUrl(photoUrl);
+      
+      // Generate initials
+      const initials = name
+        .split(' ')
+        .map((n: string) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
+      setUserInitials(initials || "U");
+
+      // Load user preferences
+      const publicUserId = (user as any).user_id;
+      if (publicUserId) {
+        const prefs = await getUserPreferences(publicUserId);
+        if (prefs) {
+          setPushNotifications(prefs.enable_push_notifications);
+          setEmailNotifications(prefs.enable_email_notifications);
+          setSpoilageAlertDays(prefs.spoilage_alert_advance_days || 3);
+          setDarkMode(prefs.theme === 'dark');
+        }
+      }
+    }
+  };
+
+  const toggleDarkMode = async () => {
+    const newDarkMode = !darkMode;
+    setDarkMode(newDarkMode);
     document.documentElement.classList.toggle('dark');
+    
+    // Save preference
+    if (userId) {
+      try {
+        await updateUserPreferences(userId, { theme: newDarkMode ? 'dark' : 'light' });
+      } catch (error) {
+        console.error('Error saving theme preference:', error);
+      }
+    }
+  };
+
+  const handlePushNotificationsChange = async (checked: boolean) => {
+    setPushNotifications(checked);
+    if (userId) {
+      try {
+        await updateUserPreferences(userId, { enable_push_notifications: checked });
+        toast.success('Notification settings updated');
+      } catch (error) {
+        console.error('Error updating notifications:', error);
+        toast.error('Failed to update settings');
+      }
+    }
+  };
+
+  const handleEmailNotificationsChange = async (checked: boolean) => {
+    setEmailNotifications(checked);
+    if (userId) {
+      try {
+        await updateUserPreferences(userId, { enable_email_notifications: checked });
+        toast.success('Email settings updated');
+      } catch (error) {
+        console.error('Error updating email settings:', error);
+        toast.error('Failed to update settings');
+      }
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      window.location.reload(); // Reload to reset app state
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   return (
@@ -29,16 +133,22 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
 
       {/* Profile Section */}
       <Card className="p-4 mb-6">
-        <div className="flex items-center gap-4">
+        <button
+          onClick={() => setIsProfileModalOpen(true)}
+          className="w-full flex items-center gap-4 hover:bg-muted/20 transition-colors rounded-lg -m-2 p-2"
+        >
           <Avatar className="w-16 h-16">
-            <AvatarFallback className="bg-primary text-primary-foreground text-xl">JD</AvatarFallback>
+            {userPhotoUrl && <AvatarImage src={userPhotoUrl} alt={userName} />}
+            <AvatarFallback className="bg-primary text-primary-foreground text-xl">
+              {userInitials}
+            </AvatarFallback>
           </Avatar>
-          <div className="flex-1">
-            <h2 className="mb-1">John Doe</h2>
-            <p className="text-muted-foreground">john.doe@email.com</p>
+          <div className="flex-1 text-left">
+            <h2 className="mb-1">{userName}</h2>
+            <p className="text-muted-foreground">{userEmail}</p>
           </div>
           <ChevronRight className="w-5 h-5 text-muted-foreground" />
-        </div>
+        </button>
       </Card>
 
       {/* Household Section */}
@@ -53,8 +163,8 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
               <Users className="w-5 h-5 text-accent" />
             </div>
             <div className="flex-1 text-left">
-              <p>The Doe Family</p>
-              <p className="text-muted-foreground">4 members</p>
+              <p>My Household</p>
+              <p className="text-muted-foreground">Manage members</p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
@@ -75,7 +185,7 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
             </div>
             <Switch
               checked={pushNotifications}
-              onCheckedChange={setPushNotifications}
+              onCheckedChange={handlePushNotificationsChange}
             />
           </div>
           <div className="p-4 flex items-center justify-between">
@@ -88,7 +198,7 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
             </div>
             <Switch
               checked={emailNotifications}
-              onCheckedChange={setEmailNotifications}
+              onCheckedChange={handleEmailNotificationsChange}
             />
           </div>
         </Card>
@@ -112,19 +222,16 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
             </div>
             <Switch checked={darkMode} onCheckedChange={toggleDarkMode} />
           </div>
-          <button className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors">
+          <button
+            onClick={() => setIsSpoilageModalOpen(true)}
+            className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors"
+          >
             <SettingsIcon className="w-5 h-5 text-muted-foreground" />
             <div className="flex-1 text-left">
               <p>Spoilage Alert Settings</p>
-              <p className="text-muted-foreground">3 days advance warning</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
-          </button>
-          <button className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors">
-            <SettingsIcon className="w-5 h-5 text-muted-foreground" />
-            <div className="flex-1 text-left">
-              <p>Default Store</p>
-              <p className="text-muted-foreground">Whole Foods Market</p>
+              <p className="text-muted-foreground">
+                {spoilageAlertDays} {spoilageAlertDays === 1 ? 'day' : 'days'} advance warning
+              </p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
@@ -135,14 +242,20 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
       <div className="mb-6">
         <h3 className="mb-3 text-muted-foreground">Support</h3>
         <Card className="divide-y">
-          <button className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors">
+          <button
+            onClick={() => setSupportModalType('help')}
+            className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors"
+          >
             <HelpCircle className="w-5 h-5 text-muted-foreground" />
             <div className="flex-1 text-left">
               <p>Help & Support</p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
-          <button className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors">
+          <button
+            onClick={() => setSupportModalType('about')}
+            className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors"
+          >
             <SettingsIcon className="w-5 h-5 text-muted-foreground" />
             <div className="flex-1 text-left">
               <p>About Pantrix</p>
@@ -154,10 +267,40 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
       </div>
 
       {/* Logout */}
-      <Button variant="outline" className="w-full text-destructive border-destructive/20 hover:bg-destructive/10">
+      <Button 
+        variant="outline" 
+        className="w-full text-destructive border-destructive/20 hover:bg-destructive/10"
+        onClick={handleSignOut}
+      >
         <LogOut className="w-5 h-5 mr-2" />
         Log Out
       </Button>
+
+      {/* Modals */}
+      <ProfileEditModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        userId={userId}
+        currentName={userName}
+        currentEmail={userEmail}
+        currentPhotoUrl={userPhotoUrl}
+        currentInitials={userInitials}
+        onProfileUpdated={loadUserData}
+      />
+
+      <SpoilageAlertModal
+        isOpen={isSpoilageModalOpen}
+        onClose={() => setIsSpoilageModalOpen(false)}
+        userId={userId}
+        currentDays={spoilageAlertDays}
+        onUpdated={(days) => setSpoilageAlertDays(days)}
+      />
+
+      <SupportModal
+        isOpen={supportModalType !== null}
+        onClose={() => setSupportModalType(null)}
+        type={supportModalType || 'help'}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { LoginScreen } from "./components/LoginScreen";
 import { SignUpScreen } from "./components/SignUpScreen";
@@ -16,6 +16,8 @@ import { AddItemScreen } from "./components/AddItemScreen";
 import { NotificationsScreen } from "./components/NotificationsScreen";
 import { BottomNav } from "./components/BottomNav";
 import { Toaster } from "./components/ui/sonner";
+import { getCurrentUser, onAuthStateChange } from "./lib/auth";
+import { Loader2 } from "lucide-react";
 
 type Screen = 
   | 'welcome' 
@@ -38,7 +40,48 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const shoppingListCount = 7;
+
+  // Check authentication state on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const user = await getCurrentUser();
+        if (user) {
+          setIsAuthenticated(true);
+          // Check if user has completed onboarding (you can store this in user metadata)
+          const hasOnboarding = localStorage.getItem(`onboarding_${user.id}`) === 'completed';
+          setHasCompletedOnboarding(hasOnboarding);
+          if (hasOnboarding) {
+            setCurrentScreen('home');
+          } else {
+            setCurrentScreen('onboarding');
+          }
+        }
+      } catch (error) {
+        console.error('Error checking auth:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = onAuthStateChange((user) => {
+      setIsAuthenticated(!!user);
+      if (!user) {
+        setCurrentScreen('welcome');
+        setIsAuthenticated(false);
+        setHasCompletedOnboarding(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const handleGetStarted = () => {
     setCurrentScreen('login');
@@ -67,12 +110,21 @@ export default function App() {
     setCurrentScreen('login');
   };
 
-  const handleOnboardingComplete = () => {
+  const handleOnboardingComplete = async () => {
     setHasCompletedOnboarding(true);
+    const user = await getCurrentUser();
+    if (user) {
+      localStorage.setItem(`onboarding_${user.id}`, 'completed');
+    }
     setCurrentScreen('home');
   };
 
-  const handleNavigate = (screen: string) => {
+  const [inventoryFilter, setInventoryFilter] = useState<string | undefined>(undefined);
+
+  const handleNavigate = (screen: string, filter?: string) => {
+    if (screen === 'inventory' && filter) {
+      setInventoryFilter(filter);
+    }
     switch (screen) {
       case 'home':
       case 'inventory':
@@ -131,6 +183,7 @@ export default function App() {
           <InventoryScreen
             onItemClick={() => handleNavigate('itemDetail')}
             onAddItem={() => handleNavigate('addItem')}
+            initialFilter={inventoryFilter}
           />
         );
       case 'itemDetail':
@@ -188,6 +241,17 @@ export default function App() {
 
   const showBottomNav = isAuthenticated && 
     !['welcome', 'login', 'signup', 'onboarding', 'itemDetail', 'household', 'spoilageAlerts', 'recipes', 'addItem', 'notifications'].includes(currentScreen);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

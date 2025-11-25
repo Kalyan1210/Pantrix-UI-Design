@@ -1,46 +1,59 @@
-import { useState } from "react";
-import { Search, Plus, Filter, Refrigerator, Package, Snowflake, Apple } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, Plus, Filter, Refrigerator, Package, Snowflake, Apple, Loader2 } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { Badge } from "./ui/badge";
 import { Card } from "./ui/card";
-
-interface InventoryItem {
-  id: string;
-  name: string;
-  quantity: number;
-  daysUntilExpiry: number;
-  location: 'fridge' | 'freezer' | 'pantry' | 'counter';
-  icon: string;
-}
+import { getInventoryItems, calculateDaysUntilExpiry, deleteInventoryItem } from "../lib/inventory";
+import { getCurrentUser } from "../lib/auth";
+import { InventoryItemUI } from "../lib/supabase";
+import { toast } from "sonner";
 
 interface InventoryScreenProps {
-  onItemClick: (item: InventoryItem) => void;
+  onItemClick: (item: InventoryItemUI) => void;
   onAddItem: () => void;
+  initialFilter?: string;
 }
 
-export function InventoryScreen({ onItemClick, onAddItem }: InventoryScreenProps) {
+export function InventoryScreen({ onItemClick, onAddItem, initialFilter }: InventoryScreenProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState("all");
+  const [activeFilter, setActiveFilter] = useState(initialFilter || "all");
+  const [items, setItems] = useState<InventoryItemUI[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("all");
 
-  const items: InventoryItem[] = [
-    { id: '1', name: 'Milk', quantity: 1, daysUntilExpiry: 0, location: 'fridge', icon: '🥛' },
-    { id: '2', name: 'Strawberries', quantity: 1, daysUntilExpiry: 1, location: 'fridge', icon: '🍓' },
-    { id: '3', name: 'Yogurt', quantity: 3, daysUntilExpiry: 2, location: 'fridge', icon: '🥛' },
-    { id: '4', name: 'Chicken Breast', quantity: 2, daysUntilExpiry: 3, location: 'fridge', icon: '🍗' },
-    { id: '5', name: 'Cheese', quantity: 1, daysUntilExpiry: 7, location: 'fridge', icon: '🧀' },
-    { id: '6', name: 'Lettuce', quantity: 1, daysUntilExpiry: 4, location: 'fridge', icon: '🥬' },
-    { id: '7', name: 'Ice Cream', quantity: 2, daysUntilExpiry: 90, location: 'freezer', icon: '🍦' },
-    { id: '8', name: 'Frozen Pizza', quantity: 3, daysUntilExpiry: 120, location: 'freezer', icon: '🍕' },
-    { id: '9', name: 'Pasta', quantity: 2, daysUntilExpiry: 365, location: 'pantry', icon: '🍝' },
-    { id: '10', name: 'Rice', quantity: 1, daysUntilExpiry: 400, location: 'pantry', icon: '🍚' },
-    { id: '11', name: 'Canned Tomatoes', quantity: 4, daysUntilExpiry: 500, location: 'pantry', icon: '🥫' },
-    { id: '12', name: 'Bananas', quantity: 6, daysUntilExpiry: 2, location: 'counter', icon: '🍌' },
-    { id: '13', name: 'Apples', quantity: 5, daysUntilExpiry: 5, location: 'counter', icon: '🍎' },
-  ];
+  useEffect(() => {
+    loadItems();
+  }, []);
 
-  const getUrgencyBadge = (days: number) => {
+  useEffect(() => {
+    if (initialFilter) {
+      setActiveFilter(initialFilter);
+    }
+  }, [initialFilter]);
+
+  const loadItems = async () => {
+    try {
+      setIsLoading(true);
+      const user = await getCurrentUser();
+      if (!user) {
+        toast.error('Please sign in to view inventory.');
+        return;
+      }
+
+      const inventoryItems = await getInventoryItems(user.id, (user as any).user_id);
+      setItems(inventoryItems);
+    } catch (error: any) {
+      console.error('Error loading inventory:', error);
+      toast.error('Failed to load inventory. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getUrgencyBadge = (days: number | null) => {
+    if (days === null) return { label: 'No expiry', variant: 'outline' as const, color: 'bg-muted text-muted-foreground' };
     if (days <= 0) return { label: 'Expired', variant: 'destructive' as const, color: 'bg-destructive/10 text-destructive border-destructive/20' };
     if (days === 1) return { label: `${days} day`, variant: 'secondary' as const, color: 'bg-secondary/10 text-secondary border-secondary/20' };
     if (days <= 2) return { label: `${days} days`, variant: 'secondary' as const, color: 'bg-secondary/10 text-secondary border-secondary/20' };
@@ -69,49 +82,82 @@ export function InventoryScreen({ onItemClick, onAddItem }: InventoryScreenProps
     }
 
     if (activeFilter === 'expiring') {
-      filtered = filtered.filter(item => item.daysUntilExpiry <= 5);
+      filtered = filtered.filter(item => {
+        const days = calculateDaysUntilExpiry(item.expiry_date);
+        return days !== null && days <= 5;
+      });
     } else if (activeFilter === 'low') {
       filtered = filtered.filter(item => item.quantity <= 2);
     }
 
-    return filtered.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry);
+    return filtered.sort((a, b) => {
+      const daysA = calculateDaysUntilExpiry(a.expiry_date) ?? Infinity;
+      const daysB = calculateDaysUntilExpiry(b.expiry_date) ?? Infinity;
+      return daysA - daysB;
+    });
   };
 
-  const renderItemList = (items: InventoryItem[]) => (
-    <div className="space-y-2">
-      {items.map((item) => {
-        const urgency = getUrgencyBadge(item.daysUntilExpiry);
-        return (
-          <Card
-            key={item.id}
-            className="p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors cursor-pointer"
-            onClick={() => onItemClick(item)}
-          >
-            <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-              <span className="text-2xl">{item.icon}</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="truncate">{item.name}</h3>
-                <span className="text-muted-foreground">×{item.quantity}</span>
+  const renderItemList = (items: InventoryItem[]) => {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      );
+    }
+
+    if (items.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">No items found</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        {items.map((item) => {
+          const daysUntilExpiry = calculateDaysUntilExpiry(item.expiry_date);
+          const urgency = getUrgencyBadge(daysUntilExpiry);
+          const LocationIcon = locationIcons[item.location];
+          
+          return (
+            <Card
+              key={item.id}
+              className="p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors cursor-pointer"
+              onClick={() => onItemClick(item)}
+            >
+              <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                {LocationIcon && <LocationIcon className="w-6 h-6 text-muted-foreground" />}
               </div>
-              <div className="flex items-center gap-2">
-                <Badge variant={urgency.variant} className={urgency.color}>
-                  {urgency.label}
-                </Badge>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="truncate font-medium">{item.name}</h3>
+                  <span className="text-muted-foreground text-sm">×{item.quantity}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant={urgency.variant} className={urgency.color}>
+                    {urgency.label}
+                  </Badge>
+                  {item.category && (
+                    <Badge variant="outline" className="text-xs">
+                      {item.category}
+                    </Badge>
+                  )}
+                </div>
               </div>
-            </div>
-          </Card>
-        );
-      })}
-    </div>
-  );
+            </Card>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="pb-24 px-4 pt-6 max-w-md mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl mb-4">Inventory</h1>
+        <h1 className="text-3xl font-bold mb-4">Inventory</h1>
         
         {/* Search */}
         <div className="relative mb-4">
@@ -151,7 +197,7 @@ export function InventoryScreen({ onItemClick, onAddItem }: InventoryScreenProps
       </div>
 
       {/* Storage Location Tabs */}
-      <Tabs defaultValue="all" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-5 mb-4">
           <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="fridge">

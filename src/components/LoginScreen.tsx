@@ -2,8 +2,10 @@ import { useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Leaf, Mail, Lock } from "lucide-react";
+import { Leaf, Mail, Lock, Loader2 } from "lucide-react";
 import { Separator } from "./ui/separator";
+import { signIn } from "../lib/auth";
+import { toast } from "sonner";
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -13,10 +15,27 @@ interface LoginScreenProps {
 export function LoginScreen({ onLogin, onSignUp }: LoginScreenProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin();
+    
+    if (!email || !password) {
+      toast.error('Please enter both email and password');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await signIn(email, password);
+      toast.success('Signed in successfully!');
+      onLogin();
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast.error(error.message || 'Failed to sign in. Please check your credentials.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -66,8 +85,15 @@ export function LoginScreen({ onLogin, onSignUp }: LoginScreenProps) {
             Forgot password?
           </Button>
 
-          <Button type="submit" className="w-full">
-            Sign In
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              'Sign In'
+            )}
           </Button>
         </form>
 

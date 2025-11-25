@@ -2,8 +2,10 @@ import { useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Leaf, Mail, Lock, User, ArrowLeft } from "lucide-react";
+import { Leaf, Mail, Lock, User, ArrowLeft, Loader2 } from "lucide-react";
 import { Separator } from "./ui/separator";
+import { signUp } from "../lib/auth";
+import { toast } from "sonner";
 
 interface SignUpScreenProps {
   onSignUp: () => void;
@@ -15,11 +17,36 @@ export function SignUpScreen({ onSignUp, onBack }: SignUpScreenProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === confirmPassword) {
+    
+    if (!email || !password) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await signUp(email, password, name);
+      toast.success('Account created successfully! Please check your email to verify your account.');
       onSignUp();
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      toast.error(error.message || 'Failed to create account. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -107,8 +134,15 @@ export function SignUpScreen({ onSignUp, onBack }: SignUpScreenProps) {
             </div>
           </div>
 
-          <Button type="submit" className="w-full">
-            Create Account
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Creating account...
+              </>
+            ) : (
+              'Create Account'
+            )}
           </Button>
         </form>
 
