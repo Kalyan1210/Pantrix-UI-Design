@@ -296,32 +296,39 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
     initializeCamera();
   };
 
-  // Camera Screen
+  // Hidden file input ref for gallery
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Camera Screen - iOS Style
   if (scanState === 'camera') {
     return (
-      <div className="min-h-screen bg-black relative flex flex-col">
-        {/* Header */}
-        <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/60 to-transparent">
-          <div className="max-w-md mx-auto px-4 py-4 flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={onBack} className="text-white hover:bg-white/20">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <h1 className="text-xl text-white font-semibold">Capture</h1>
-          </div>
+      <div className="fixed inset-0 bg-black flex flex-col" style={{ zIndex: 9999 }}>
+        {/* Top Bar */}
+        <div className="relative z-20 flex items-center justify-between px-4 py-3 bg-black/50">
+          <button 
+            onClick={onBack}
+            className="w-10 h-10 rounded-full bg-gray-800/80 flex items-center justify-center"
+          >
+            <X className="w-6 h-6 text-white" />
+          </button>
+          <span className="text-white font-medium">PHOTO</span>
+          <div className="w-10" /> {/* Spacer */}
         </div>
 
-        {/* Camera View */}
-        <div className="flex-1 relative flex items-center justify-center overflow-hidden">
+        {/* Camera Preview Area */}
+        <div className="flex-1 relative bg-black">
           {hasPermission === false || cameraError ? (
-            <div className="flex flex-col items-center justify-center p-6 text-white">
-              <Camera className="w-16 h-16 mb-4 opacity-50" />
-              <p className="text-center mb-4">{cameraError || 'Camera permission denied'}</p>
-              <Button onClick={initializeCamera} variant="outline" className="text-white border-white/40">
-                Retry
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-white">
+              <Camera className="w-20 h-20 mb-6 opacity-50" />
+              <p className="text-center text-lg mb-2">Camera access needed</p>
+              <p className="text-center text-sm text-white/60 mb-6">{cameraError || 'Please allow camera permission'}</p>
+              <Button onClick={initializeCamera} className="bg-white text-black hover:bg-white/90">
+                Enable Camera
               </Button>
             </div>
           ) : (
             <>
+              {/* Live Camera Feed */}
               <video
                 ref={videoRef}
                 autoPlay
@@ -330,25 +337,11 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
                 className="absolute inset-0 w-full h-full object-cover"
               />
               
-              {/* Frame Guide with Green Corners */}
-              <div className="relative z-10 w-full max-w-sm mx-4">
-                <div className="relative border-2 border-transparent rounded-2xl aspect-[3/4]">
-                  {/* Green corner indicators */}
-                  <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-green-500 rounded-tl-2xl" />
-                  <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-green-500 rounded-tr-2xl" />
-                  <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-green-500 rounded-bl-2xl" />
-                  <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-green-500 rounded-br-2xl" />
-                </div>
-              </div>
-
-              {/* Instructions Overlay */}
-              <div className="absolute top-24 left-0 right-0 z-10 px-4">
-                <div className="max-w-md mx-auto bg-black/60 backdrop-blur-sm rounded-lg px-4 py-3">
-                  <p className="text-white text-center text-sm font-medium">
-                    📸 Position receipt or product in frame
-                  </p>
-                  <p className="text-white/70 text-center text-xs mt-1">
-                    Tap the white button below to capture
+              {/* Scan hint overlay */}
+              <div className="absolute top-4 left-0 right-0 z-10 px-4">
+                <div className="mx-auto bg-black/50 backdrop-blur-sm rounded-full px-4 py-2 w-fit">
+                  <p className="text-white text-center text-sm">
+                    📸 Point at receipt or product
                   </p>
                 </div>
               </div>
@@ -356,47 +349,51 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
           )}
         </div>
 
-        {/* Bottom Controls */}
-        <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent pb-safe">
-          <div className="max-w-md mx-auto px-4 py-6">
-            {/* Button labels row */}
-            <div className="flex items-center justify-center gap-8 mb-3">
-              <span className="text-white/80 text-xs w-12 text-center">Gallery</span>
-              <span className="text-white font-medium text-sm w-20 text-center">Capture</span>
-              <span className="text-white/80 text-xs w-12 text-center">Flip</span>
-            </div>
-            
-            {/* Buttons row */}
-            <div className="flex items-center justify-center gap-8">
-              {/* Gallery Button */}
-              <label className="w-14 h-14 rounded-full bg-white/20 border-2 border-white/50 text-white hover:bg-white/30 flex items-center justify-center cursor-pointer transition-colors">
-                <ImageIcon className="w-6 h-6" />
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleGallerySelect}
-                />
-              </label>
+        {/* Bottom Controls - iOS Camera Style */}
+        <div className="relative z-20 bg-black px-6 py-8 pb-10">
+          <div className="flex items-center justify-between max-w-sm mx-auto">
+            {/* Gallery Button - Shows thumbnail or icon */}
+            <label className="cursor-pointer">
+              <div className="w-14 h-14 rounded-xl bg-gray-800 border-2 border-white/30 flex items-center justify-center overflow-hidden hover:border-white/60 transition-colors">
+                <ImageIcon className="w-7 h-7 text-white" />
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture={undefined}
+                className="hidden"
+                onChange={handleGallerySelect}
+              />
+            </label>
 
-              {/* Capture Button - Made more prominent */}
-              <button
-                onClick={handleCapture}
-                disabled={hasPermission === false || !!cameraError}
-                className="w-20 h-20 rounded-full bg-white flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed ring-4 ring-white/30"
-              >
-                <div className="w-16 h-16 rounded-full border-4 border-primary/50 bg-white" />
-              </button>
+            {/* Shutter Button - Large White Circle */}
+            <button
+              onClick={handleCapture}
+              disabled={hasPermission === false || !!cameraError}
+              className="w-[72px] h-[72px] rounded-full bg-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                boxShadow: '0 0 0 4px rgba(255,255,255,0.3), 0 4px 20px rgba(0,0,0,0.4)'
+              }}
+            >
+              <div className="w-[62px] h-[62px] rounded-full border-[3px] border-black/10" />
+            </button>
 
-              {/* Flip Camera Button */}
-              <button
-                onClick={flipCamera}
-                disabled={hasPermission === false || !!cameraError}
-                className="w-14 h-14 rounded-full bg-white/20 border-2 border-white/50 text-white hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <RotateCcw className="w-6 h-6" />
-              </button>
-            </div>
+            {/* Flip Camera Button */}
+            <button
+              onClick={flipCamera}
+              disabled={hasPermission === false || !!cameraError}
+              className="w-14 h-14 rounded-full bg-gray-800/80 flex items-center justify-center hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <RotateCcw className="w-6 h-6 text-white" />
+            </button>
+          </div>
+
+          {/* Mode indicator */}
+          <div className="flex items-center justify-center gap-6 mt-6">
+            <span className="text-white/50 text-sm">VIDEO</span>
+            <span className="text-yellow-400 font-medium text-sm">PHOTO</span>
+            <span className="text-white/50 text-sm">SCAN</span>
           </div>
         </div>
       </div>

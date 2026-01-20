@@ -65,54 +65,34 @@ export async function addInventoryItem(
       expiryDate = estimated.toISOString().split('T')[0];
     }
 
-    // Try with 'name' column first, fallback to 'custom_name' for legacy schema
-    let data, error;
-    
-    // First attempt with simple column names
-    const simpleInsert = await supabase
+    // Insert with all possible column names for compatibility
+    // Include household_id = user_id for schemas that require it
+    const insertData: any = {
+      user_id: authUserId,
+      household_id: authUserId, // Use user's ID as their household
+      quantity: item.quantity,
+      category: item.category,
+      purchase_date: item.purchase_date || new Date().toISOString().split('T')[0],
+      price: item.price,
+      image_url: item.image_url,
+      input_method: 'manual',
+      state: 'stocked',
+      added_by: authUserId,
+    };
+
+    // Add both column name variants
+    insertData.name = item.name;
+    insertData.custom_name = item.name;
+    insertData.location = location;
+    insertData.storage_location = location;
+    insertData.expiry_date = expiryDate;
+    insertData.expected_expiry_date = expiryDate;
+
+    const { data, error } = await supabase
       .from('inventory_items')
-      .insert({
-        user_id: authUserId,
-        name: item.name,
-        quantity: item.quantity,
-        category: item.category,
-        location: location,
-        purchase_date: item.purchase_date || new Date().toISOString().split('T')[0],
-        expiry_date: expiryDate,
-        price: item.price,
-        image_url: item.image_url,
-      })
+      .insert(insertData)
       .select()
       .single();
-    
-    if (simpleInsert.error && simpleInsert.error.message.includes("'name'")) {
-      // Fallback to legacy schema with custom_name
-      const legacyInsert = await supabase
-        .from('inventory_items')
-        .insert({
-          user_id: authUserId,
-          custom_name: item.name,
-          quantity: item.quantity,
-          category: item.category,
-          storage_location: location,
-          location: location,
-          purchase_date: item.purchase_date || new Date().toISOString().split('T')[0],
-          expected_expiry_date: expiryDate,
-          expiry_date: expiryDate,
-          price: item.price,
-          image_url: item.image_url,
-          input_method: 'manual',
-          state: 'stocked',
-        })
-        .select()
-        .single();
-      
-      data = legacyInsert.data;
-      error = legacyInsert.error;
-    } else {
-      data = simpleInsert.data;
-      error = simpleInsert.error;
-    }
 
     if (error) {
       console.error('Error adding inventory item:', error);
@@ -162,8 +142,9 @@ export async function addMultipleInventoryItems(
 
       return {
         user_id: authUserId,
-        custom_name: item.name, // Use custom_name for compatibility
-        name: item.name, // Also try name
+        household_id: authUserId, // Use user's ID as their household
+        custom_name: item.name,
+        name: item.name,
         quantity: item.quantity,
         category: item.category,
         storage_location: location,
@@ -174,6 +155,7 @@ export async function addMultipleInventoryItems(
         price: item.price,
         input_method: 'receipt_scan',
         state: 'stocked',
+        added_by: authUserId,
       };
     });
 
