@@ -65,7 +65,11 @@ export async function addInventoryItem(
       expiryDate = estimated.toISOString().split('T')[0];
     }
 
-    const { data, error } = await supabase
+    // Try with 'name' column first, fallback to 'custom_name' for legacy schema
+    let data, error;
+    
+    // First attempt with simple column names
+    const simpleInsert = await supabase
       .from('inventory_items')
       .insert({
         user_id: authUserId,
@@ -80,6 +84,35 @@ export async function addInventoryItem(
       })
       .select()
       .single();
+    
+    if (simpleInsert.error && simpleInsert.error.message.includes("'name'")) {
+      // Fallback to legacy schema with custom_name
+      const legacyInsert = await supabase
+        .from('inventory_items')
+        .insert({
+          user_id: authUserId,
+          custom_name: item.name,
+          quantity: item.quantity,
+          category: item.category,
+          storage_location: location,
+          location: location,
+          purchase_date: item.purchase_date || new Date().toISOString().split('T')[0],
+          expected_expiry_date: expiryDate,
+          expiry_date: expiryDate,
+          price: item.price,
+          image_url: item.image_url,
+          input_method: 'manual',
+          state: 'stocked',
+        })
+        .select()
+        .single();
+      
+      data = legacyInsert.data;
+      error = legacyInsert.error;
+    } else {
+      data = simpleInsert.data;
+      error = simpleInsert.error;
+    }
 
     if (error) {
       console.error('Error adding inventory item:', error);
@@ -87,16 +120,16 @@ export async function addInventoryItem(
     }
 
     return {
-      id: data.id,
-      name: data.name,
+      id: data.id || data.item_id,
+      name: data.name || data.custom_name || 'Unnamed Item',
       quantity: Number(data.quantity),
       category: data.category,
-      location: data.location as 'fridge' | 'freezer' | 'pantry' | 'counter',
+      location: (data.location || data.storage_location || 'pantry') as 'fridge' | 'freezer' | 'pantry' | 'counter',
       purchase_date: data.purchase_date,
-      expiry_date: data.expiry_date,
+      expiry_date: data.expiry_date || data.expected_expiry_date,
       price: data.price ? Number(data.price) : undefined,
       image_url: data.image_url,
-      daysUntilExpiry: calculateDaysUntilExpiry(data.expiry_date),
+      daysUntilExpiry: calculateDaysUntilExpiry(data.expiry_date || data.expected_expiry_date),
     };
   } catch (error: any) {
     console.error('Error in addInventoryItem:', error);
@@ -129,16 +162,22 @@ export async function addMultipleInventoryItems(
 
       return {
         user_id: authUserId,
-        name: item.name,
+        custom_name: item.name, // Use custom_name for compatibility
+        name: item.name, // Also try name
         quantity: item.quantity,
         category: item.category,
+        storage_location: location,
         location: location,
         purchase_date: new Date().toISOString().split('T')[0],
+        expected_expiry_date: expiryDate,
         expiry_date: expiryDate,
         price: item.price,
+        input_method: 'receipt_scan',
+        state: 'stocked',
       };
     });
 
+    // Try insert - Supabase will ignore columns that don't exist
     const { data, error } = await supabase
       .from('inventory_items')
       .insert(itemsToInsert)

@@ -18,48 +18,8 @@ interface Notification {
 }
 
 export function NotificationsScreen({ onBack }: NotificationsScreenProps) {
-  const [notifications, setNotifications] = React.useState<Notification[]>([
-    {
-      id: '1',
-      type: 'spoilage',
-      title: 'Items Expiring Soon',
-      message: '3 items in your fridge are expiring today',
-      time: '2 hours ago',
-      read: false,
-    },
-    {
-      id: '2',
-      type: 'household',
-      title: 'Sarah added items',
-      message: 'Sarah added milk and eggs to the shopping list',
-      time: '3 hours ago',
-      read: false,
-    },
-    {
-      id: '3',
-      type: 'spoilage',
-      title: 'Strawberries expiring',
-      message: 'Use your strawberries within 24 hours',
-      time: '5 hours ago',
-      read: true,
-    },
-    {
-      id: '4',
-      type: 'shopping',
-      title: 'Running low on essentials',
-      message: 'You have 4 items running low in your pantry',
-      time: '1 day ago',
-      read: true,
-    },
-    {
-      id: '5',
-      type: 'household',
-      title: 'Mike joined household',
-      message: 'Mike Johnson joined "The Doe Family"',
-      time: '2 days ago',
-      read: true,
-    },
-  ]);
+  // Start with empty notifications for new users - real notifications would come from backend
+  const [notifications, setNotifications] = React.useState<Notification[]>([]);
 
   const markAllAsRead = () => {
     setNotifications(notifications.map(n => ({ ...n, read: true })));

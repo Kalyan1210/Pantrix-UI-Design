@@ -18,7 +18,7 @@ import { NotificationsScreen } from "./components/NotificationsScreen";
 import { BottomNav } from "./components/BottomNav";
 import { Toaster } from "./components/ui/sonner";
 import { getCurrentUser, onAuthStateChange } from "./lib/auth";
-import { Loader2 } from "lucide-react";
+// Loader2 removed - using custom emoji animation
 
 type Screen = 
   | 'welcome' 
@@ -42,7 +42,21 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const shoppingListCount = 7;
+  const [shoppingListCount, setShoppingListCount] = useState(0);
+  
+  // Load shopping list count from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('shopping_list_items');
+    if (saved) {
+      try {
+        const items = JSON.parse(saved);
+        const activeItems = items.filter((item: any) => !item.completed);
+        setShoppingListCount(activeItems.length);
+      } catch (e) {
+        console.error('Error loading shopping list count:', e);
+      }
+    }
+  }, [currentScreen]); // Re-check when screen changes
 
   // Check authentication state on mount
   useEffect(() => {
@@ -245,12 +259,19 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center overflow-hidden">
         <style>{`
-          @keyframes fadeInSpring {
+          @keyframes springIn {
             0% {
               opacity: 0;
-              transform: scale(0.3) rotate(0deg);
+              transform: scale(0.2) rotate(-180deg);
+            }
+            50% {
+              opacity: 1;
+              transform: scale(1.2) rotate(10deg);
+            }
+            70% {
+              transform: scale(0.9) rotate(-5deg);
             }
             100% {
               opacity: 1;
@@ -259,46 +280,68 @@ export default function App() {
           }
           
           @keyframes gentleSpinPulse {
-            0% {
+            0%, 100% {
               transform: scale(1) rotate(0deg);
             }
             25% {
-              transform: scale(1.05) rotate(90deg);
+              transform: scale(1.08) rotate(5deg);
             }
             50% {
-              transform: scale(1.1) rotate(180deg);
+              transform: scale(1.15) rotate(0deg);
             }
             75% {
-              transform: scale(1.05) rotate(270deg);
-            }
-            100% {
-              transform: scale(1) rotate(360deg);
+              transform: scale(1.08) rotate(-5deg);
             }
           }
           
-          @keyframes fadeIn {
+          @keyframes textSlideUp {
             0% {
               opacity: 0;
+              transform: translateY(20px);
             }
             100% {
               opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          
+          @keyframes shimmer {
+            0% {
+              background-position: -200% 0;
+            }
+            100% {
+              background-position: 200% 0;
             }
           }
           
           .emoji-loading {
-            font-size: 160px;
-            animation: fadeInSpring 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards, 
-                       gentleSpinPulse 4s ease-in-out 0.6s infinite;
+            font-size: 120px;
+            animation: springIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards, 
+                       gentleSpinPulse 2s ease-in-out 0.5s infinite;
+            filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.15));
           }
           
           .text-loading {
-            animation: fadeIn 0.6s ease-out forwards;
+            animation: textSlideUp 0.4s ease-out 0.3s forwards;
+            opacity: 0;
+            background: linear-gradient(90deg, hsl(var(--foreground)) 40%, hsl(var(--primary)) 50%, hsl(var(--foreground)) 60%);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: textSlideUp 0.4s ease-out 0.3s forwards, shimmer 3s linear 0.7s infinite;
+          }
+          
+          .loader-dot {
+            animation: gentleSpinPulse 1.5s ease-in-out infinite;
           }
         `}</style>
-        <div className="flex flex-col items-center gap-4">
-          <div className="mb-4 emoji-loading">🥗</div>
-          <h1 className="text-4xl font-semibold text-foreground mb-8 text-loading">Pantrix</h1>
-          <Loader2 className="w-10 h-10 animate-spin text-primary" />
+        <div className="flex flex-col items-center">
+          <div className="emoji-loading mb-6">🥗</div>
+          <h1 className="text-4xl font-bold text-loading tracking-tight">Pantrix</h1>
+          <p className="text-muted-foreground mt-3 text-sm" style={{ animation: 'textSlideUp 0.4s ease-out 0.5s forwards', opacity: 0 }}>
+            Your smart pantry companion
+          </p>
         </div>
       </div>
     );

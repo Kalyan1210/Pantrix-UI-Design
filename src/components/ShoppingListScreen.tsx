@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Share2, SlidersHorizontal, Users } from "lucide-react";
+import { Plus, Share2, SlidersHorizontal, Users, ShoppingCart } from "lucide-react";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Card } from "./ui/card";
@@ -21,7 +21,7 @@ interface ShoppingItem {
 }
 
 export function ShoppingListScreen({ onAddItem }: ShoppingListScreenProps) {
-  // Load initial items from localStorage or use default
+  // Load items from localStorage - start empty for new users
   const loadItemsFromStorage = () => {
     const saved = localStorage.getItem('shopping_list_items');
     if (saved) {
@@ -31,15 +31,8 @@ export function ShoppingListScreen({ onAddItem }: ShoppingListScreenProps) {
         console.error('Error loading shopping list:', e);
       }
     }
-    return [
-      { id: '1', name: 'Milk', quantity: 1, category: 'Dairy', priority: 'urgent', reason: 'expiring', completed: false },
-      { id: '2', name: 'Strawberries', quantity: 1, category: 'Produce', priority: 'urgent', reason: 'expiring', completed: false },
-      { id: '3', name: 'Eggs', quantity: 12, category: 'Dairy', priority: 'normal', reason: 'low', completed: false },
-      { id: '4', name: 'Bread', quantity: 1, category: 'Bakery', priority: 'normal', reason: 'low', completed: false },
-      { id: '5', name: 'Chicken Breast', quantity: 2, category: 'Meat', priority: 'normal', reason: 'manual', completed: true },
-      { id: '6', name: 'Lettuce', quantity: 1, category: 'Produce', priority: 'normal', reason: 'manual', completed: false },
-      { id: '7', name: 'Yogurt', quantity: 4, category: 'Dairy', priority: 'urgent', reason: 'low', completed: false },
-    ];
+    // Return empty array for new users
+    return [];
   };
 
   const [items, setItems] = useState<ShoppingItem[]>(loadItemsFromStorage);
@@ -88,14 +81,15 @@ export function ShoppingListScreen({ onAddItem }: ShoppingListScreenProps) {
           </Button>
         </div>
 
-        {/* Collaboration indicator */}
-        <Alert className="border-accent/50 bg-accent/5">
-          <Users className="h-5 w-5 text-accent" />
-          <AlertDescription className="ml-2">
-            <span>Shared with 3 people</span>
-            <span className="text-muted-foreground ml-2">• Sarah added milk 2h ago</span>
-          </AlertDescription>
-        </Alert>
+        {/* Collaboration indicator - only show if items exist */}
+        {items.length > 0 && (
+          <Alert className="border-accent/50 bg-accent/5">
+            <Users className="h-5 w-5 text-accent" />
+            <AlertDescription className="ml-2">
+              <span>Your personal shopping list</span>
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
 
       {/* Active Items by Category */}
@@ -184,14 +178,33 @@ export function ShoppingListScreen({ onAddItem }: ShoppingListScreenProps) {
         </div>
       )}
 
+      {/* Empty State */}
+      {items.length === 0 && (
+        <div className="text-center py-12">
+          <div className="w-20 h-20 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
+            <ShoppingCart className="w-10 h-10 text-muted-foreground" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Your list is empty</h2>
+          <p className="text-muted-foreground mb-6">
+            Add items you need to buy
+          </p>
+          <Button onClick={onAddItem}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add First Item
+          </Button>
+        </div>
+      )}
+
       {/* Floating Action Button */}
-      <button
-        onClick={onAddItem}
-        className="fixed bottom-20 right-4 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:scale-110 transition-transform z-40"
-        aria-label="Add item to shopping list"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
+      {items.length > 0 && (
+        <button
+          onClick={onAddItem}
+          className="fixed bottom-20 right-4 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:scale-110 transition-transform z-40"
+          aria-label="Add item to shopping list"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      )}
     </div>
   );
 }
