@@ -3,34 +3,33 @@ import { getLocationForCategory, estimateExpiryDate } from './anthropic';
 
 /**
  * Get all inventory items for the current user
- * Works with simple schema (user_id, name, location, expiry_date)
+ * Uses legacy column names (custom_name, storage_location, expected_expiry_date, item_id)
  */
 export async function getInventoryItems(authUserId: string): Promise<InventoryItemUI[]> {
   try {
-    // Get items directly by auth user_id - simple and reliable
     const { data, error } = await supabase
       .from('inventory_items')
       .select('*')
       .eq('user_id', authUserId)
-      .order('expiry_date', { ascending: true, nullsFirst: false });
+      .order('expected_expiry_date', { ascending: true, nullsFirst: false });
 
     if (error) {
       console.error('Error fetching inventory:', error);
       throw error;
     }
 
-    // Map database items to UI items (handle both old and new schema)
+    // Map database items to UI items - handle legacy column names
     return (data || []).map((item): InventoryItemUI => ({
-      id: item.id || item.item_id,
-      name: item.name || item.custom_name || 'Unnamed Item',
+      id: item.item_id || item.id,
+      name: item.custom_name || item.name || 'Unnamed Item',
       quantity: Number(item.quantity) || 1,
       category: item.category || 'other',
-      location: (item.location || item.storage_location || 'pantry') as 'fridge' | 'freezer' | 'pantry' | 'counter',
+      location: (item.storage_location || item.location || 'pantry') as 'fridge' | 'freezer' | 'pantry' | 'counter',
       purchase_date: item.purchase_date,
-      expiry_date: item.expiry_date || item.expected_expiry_date || null,
+      expiry_date: item.expected_expiry_date || item.expiry_date || null,
       price: item.price ? Number(item.price) : undefined,
       image_url: item.image_url || item.source_image_url,
-      daysUntilExpiry: calculateDaysUntilExpiry(item.expiry_date || item.expected_expiry_date),
+      daysUntilExpiry: calculateDaysUntilExpiry(item.expected_expiry_date || item.expiry_date),
     }));
   } catch (error: any) {
     console.error('Error fetching inventory:', error);
@@ -40,6 +39,7 @@ export async function getInventoryItems(authUserId: string): Promise<InventoryIt
 
 /**
  * Add a single item to inventory
+ * Uses ONLY legacy column names that exist in the database
  */
 export async function addInventoryItem(
   authUserId: string,
@@ -55,38 +55,30 @@ export async function addInventoryItem(
   }
 ): Promise<InventoryItemUI> {
   try {
-    // Auto-assign location if not provided
-    const location = item.location || getLocationForCategory(item.category);
+    const storageLocation = item.location || getLocationForCategory(item.category);
 
-    // Estimate expiry date if not provided
     let expiryDate = item.expiry_date;
     if (!expiryDate) {
       const estimated = estimateExpiryDate(item.category);
       expiryDate = estimated.toISOString().split('T')[0];
     }
 
-    // Insert with all possible column names for compatibility
-    // Include household_id = user_id for schemas that require it
-    const insertData: any = {
+    // Use ONLY legacy column names that exist in the database
+    const insertData = {
       user_id: authUserId,
-      household_id: authUserId, // Use user's ID as their household
+      household_id: authUserId,
+      custom_name: item.name,
       quantity: item.quantity,
       category: item.category,
+      storage_location: storageLocation,
       purchase_date: item.purchase_date || new Date().toISOString().split('T')[0],
-      price: item.price,
-      image_url: item.image_url,
+      expected_expiry_date: expiryDate,
+      price: item.price || null,
+      image_url: item.image_url || null,
       input_method: 'manual',
       state: 'stocked',
       added_by: authUserId,
     };
-
-    // Add both column name variants
-    insertData.name = item.name;
-    insertData.custom_name = item.name;
-    insertData.location = location;
-    insertData.storage_location = location;
-    insertData.expiry_date = expiryDate;
-    insertData.expected_expiry_date = expiryDate;
 
     const { data, error } = await supabase
       .from('inventory_items')
@@ -100,16 +92,16 @@ export async function addInventoryItem(
     }
 
     return {
-      id: data.id || data.item_id,
-      name: data.name || data.custom_name || 'Unnamed Item',
+      id: data.item_id || data.id,
+      name: data.custom_name || data.name || 'Unnamed Item',
       quantity: Number(data.quantity),
       category: data.category,
-      location: (data.location || data.storage_location || 'pantry') as 'fridge' | 'freezer' | 'pantry' | 'counter',
+      location: (data.storage_location || data.location || 'pantry') as 'fridge' | 'freezer' | 'pantry' | 'counter',
       purchase_date: data.purchase_date,
-      expiry_date: data.expiry_date || data.expected_expiry_date,
+      expiry_date: data.expected_expiry_date || data.expiry_date,
       price: data.price ? Number(data.price) : undefined,
       image_url: data.image_url,
-      daysUntilExpiry: calculateDaysUntilExpiry(data.expiry_date || data.expected_expiry_date),
+      daysUntilExpiry: calculateDaysUntilExpiry(data.expected_expiry_date || data.expiry_date),
     };
   } catch (error: any) {
     console.error('Error in addInventoryItem:', error);
@@ -133,33 +125,30 @@ export async function addMultipleInventoryItems(
 ): Promise<InventoryItemUI[]> {
   try {
     const itemsToInsert = items.map((item) => {
-      const location = item.location || getLocationForCategory(item.category);
+      const storageLocation = item.location || getLocationForCategory(item.category);
       let expiryDate = item.expiry_date;
       if (!expiryDate) {
         const estimated = estimateExpiryDate(item.category);
         expiryDate = estimated.toISOString().split('T')[0];
       }
 
+      // Use ONLY legacy column names
       return {
         user_id: authUserId,
-        household_id: authUserId, // Use user's ID as their household
+        household_id: authUserId,
         custom_name: item.name,
-        name: item.name,
         quantity: item.quantity,
         category: item.category,
-        storage_location: location,
-        location: location,
+        storage_location: storageLocation,
         purchase_date: new Date().toISOString().split('T')[0],
         expected_expiry_date: expiryDate,
-        expiry_date: expiryDate,
-        price: item.price,
+        price: item.price || null,
         input_method: 'receipt_scan',
         state: 'stocked',
         added_by: authUserId,
       };
     });
 
-    // Try insert - Supabase will ignore columns that don't exist
     const { data, error } = await supabase
       .from('inventory_items')
       .insert(itemsToInsert)
@@ -171,15 +160,15 @@ export async function addMultipleInventoryItems(
     }
 
     return (data || []).map((item): InventoryItemUI => ({
-      id: item.id,
-      name: item.name,
+      id: item.item_id || item.id,
+      name: item.custom_name || item.name || 'Unnamed Item',
       quantity: Number(item.quantity),
       category: item.category,
-      location: item.location as 'fridge' | 'freezer' | 'pantry' | 'counter',
+      location: (item.storage_location || 'pantry') as 'fridge' | 'freezer' | 'pantry' | 'counter',
       purchase_date: item.purchase_date,
-      expiry_date: item.expiry_date,
+      expiry_date: item.expected_expiry_date || item.expiry_date,
       price: item.price ? Number(item.price) : undefined,
-      daysUntilExpiry: calculateDaysUntilExpiry(item.expiry_date),
+      daysUntilExpiry: calculateDaysUntilExpiry(item.expected_expiry_date),
     }));
   } catch (error: any) {
     console.error('Error in addMultipleInventoryItems:', error);
@@ -202,13 +191,22 @@ export async function updateInventoryItem(
   }>
 ): Promise<InventoryItemUI> {
   try {
+    // Map to legacy column names
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    };
+    
+    if (updates.name !== undefined) updateData.custom_name = updates.name;
+    if (updates.quantity !== undefined) updateData.quantity = updates.quantity;
+    if (updates.category !== undefined) updateData.category = updates.category;
+    if (updates.location !== undefined) updateData.storage_location = updates.location;
+    if (updates.expiry_date !== undefined) updateData.expected_expiry_date = updates.expiry_date;
+    if (updates.price !== undefined) updateData.price = updates.price;
+
     const { data, error } = await supabase
       .from('inventory_items')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', itemId)
+      .update(updateData)
+      .eq('item_id', itemId)
       .select()
       .single();
 
@@ -218,15 +216,15 @@ export async function updateInventoryItem(
     }
 
     return {
-      id: data.id,
-      name: data.name,
+      id: data.item_id || data.id,
+      name: data.custom_name || data.name || 'Unnamed Item',
       quantity: Number(data.quantity),
       category: data.category,
-      location: data.location as 'fridge' | 'freezer' | 'pantry' | 'counter',
+      location: (data.storage_location || 'pantry') as 'fridge' | 'freezer' | 'pantry' | 'counter',
       purchase_date: data.purchase_date,
-      expiry_date: data.expiry_date,
+      expiry_date: data.expected_expiry_date || data.expiry_date,
       price: data.price ? Number(data.price) : undefined,
-      daysUntilExpiry: calculateDaysUntilExpiry(data.expiry_date),
+      daysUntilExpiry: calculateDaysUntilExpiry(data.expected_expiry_date),
     };
   } catch (error: any) {
     console.error('Error in updateInventoryItem:', error);
@@ -239,14 +237,23 @@ export async function updateInventoryItem(
  */
 export async function deleteInventoryItem(itemId: string): Promise<void> {
   try {
-    const { error } = await supabase
+    // Try with item_id first (legacy), then id
+    let { error } = await supabase
       .from('inventory_items')
       .delete()
-      .eq('id', itemId);
+      .eq('item_id', itemId);
 
     if (error) {
-      console.error('Error deleting inventory item:', error);
-      throw error;
+      // Fallback to 'id' column
+      const result = await supabase
+        .from('inventory_items')
+        .delete()
+        .eq('id', itemId);
+      
+      if (result.error) {
+        console.error('Error deleting inventory item:', result.error);
+        throw result.error;
+      }
     }
   } catch (error: any) {
     console.error('Error in deleteInventoryItem:', error);
