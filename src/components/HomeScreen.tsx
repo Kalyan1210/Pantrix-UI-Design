@@ -24,7 +24,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         const user = await getCurrentUser();
         if (!user) return;
 
-        const items = await getInventoryItems(user.id, (user as any).user_id);
+        const items = await getInventoryItems(user.id);
         
         // Calculate expiring today (0 days or less)
         const expiringToday = items.filter(item => {
@@ -48,11 +48,24 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     loadStats();
   }, []);
 
-  const recentActivity = [
-    { action: 'Added 3 items', detail: 'From receipt scan', time: '2 hours ago' },
-    { action: 'Sarah added milk', detail: 'To shopping list', time: '3 hours ago' },
-    { action: '2 items expiring soon', detail: 'Strawberries, Yogurt', time: '5 hours ago' },
-  ];
+  // No hardcoded activity - this will be populated from actual user data
+  const [hasItems, setHasItems] = useState(false);
+  
+  useEffect(() => {
+    // Check if user has any items
+    const checkItems = async () => {
+      try {
+        const user = await getCurrentUser();
+        if (user) {
+          const items = await getInventoryItems(user.id);
+          setHasItems(items.length > 0);
+        }
+      } catch (error) {
+        console.error('Error checking items:', error);
+      }
+    };
+    checkItems();
+  }, []);
 
   const handleStatClick = (filter: string) => {
     // Navigate to inventory with the filter applied
@@ -72,9 +85,12 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
             onClick={() => onNavigate('notifications')}
           >
             <Bell className="w-5 h-5" />
-            <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-destructive">
-              2
-            </Badge>
+            {/* Show badge only when there are expiring items */}
+            {stats[0].value > 0 && (
+              <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-destructive">
+                {stats[0].value}
+              </Badge>
+            )}
           </Button>
         </div>
         <p className="text-muted-foreground">Here's what's happening with your pantry</p>
@@ -127,7 +143,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
             className="flex flex-col items-center justify-center p-4 rounded-xl bg-primary/10 hover:bg-primary/20 transition-colors"
           >
             <Camera className="w-6 h-6 text-primary mb-2" />
-            <span className="text-sm">Scan Receipt</span>
+            <span className="text-sm">Capture</span>
           </button>
           <button
             onClick={() => onNavigate('addItem')}
@@ -146,46 +162,69 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         </div>
       </div>
 
-      {/* Recent Activity */}
+      {/* Getting Started / Recent Activity */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2>Recent Activity</h2>
-          <Button variant="ghost" size="sm" onClick={() => onNavigate('inventory')}>
-            See all
-          </Button>
+          <h2>{hasItems ? 'Your Pantry' : 'Get Started'}</h2>
+          {hasItems && (
+            <Button variant="ghost" size="sm" onClick={() => onNavigate('inventory')}>
+              See all
+            </Button>
+          )}
         </div>
-        <Card className="divide-y">
-          {recentActivity.map((activity, index) => (
+        {hasItems ? (
+          <Card className="p-4">
             <button
-              key={index}
               onClick={() => onNavigate('inventory')}
-              className="w-full p-4 flex items-start gap-3 hover:bg-muted/50 transition-colors text-left"
+              className="w-full flex items-center gap-3 hover:bg-muted/50 transition-colors text-left rounded-lg -m-2 p-2"
             >
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Package className="w-5 h-5 text-primary" />
+              </div>
               <div className="flex-1">
-                <p className="mb-1">{activity.action}</p>
-                <p className="text-muted-foreground">{activity.detail}</p>
+                <p className="font-medium">{stats[2].value} items in your pantry</p>
+                <p className="text-muted-foreground text-sm">Tap to view inventory</p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">{activity.time}</span>
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
             </button>
-          ))}
-        </Card>
+          </Card>
+        ) : (
+          <Card className="p-6 text-center">
+            <div className="w-16 h-16 rounded-full bg-primary/10 mx-auto mb-4 flex items-center justify-center">
+              <Package className="w-8 h-8 text-primary" />
+            </div>
+            <h3 className="font-medium mb-2">Your pantry is empty</h3>
+            <p className="text-muted-foreground text-sm mb-4">
+              Start by adding items manually or scan a receipt to get started!
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Button size="sm" onClick={() => onNavigate('addItem')}>
+                <Plus className="w-4 h-4 mr-1" />
+                Add Item
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => onNavigate('scan')}>
+                <Camera className="w-4 h-4 mr-1" />
+                Capture
+              </Button>
+            </div>
+          </Card>
+        )}
       </div>
 
-      {/* Achievement Badge */}
-      <Card className="mt-6 p-4 bg-gradient-to-r from-primary/10 to-accent/10">
-        <div className="flex items-start gap-3">
-          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-            <span className="text-2xl">🎉</span>
+      {/* Achievement Badge - Only show when user has items */}
+      {hasItems && (
+        <Card className="mt-6 p-4 bg-gradient-to-r from-primary/10 to-accent/10">
+          <div className="flex items-start gap-3">
+            <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+              <span className="text-2xl">🎉</span>
+            </div>
+            <div className="flex-1">
+              <h3>Great job!</h3>
+              <p className="text-muted-foreground">Keep tracking your items to reduce food waste!</p>
+            </div>
           </div>
-          <div className="flex-1">
-            <h3>Great job!</h3>
-            <p className="text-muted-foreground">You've prevented $47 worth of food waste this month</p>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      )}
     </div>
   );
 }

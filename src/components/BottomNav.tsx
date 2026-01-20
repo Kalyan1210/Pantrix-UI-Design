@@ -11,7 +11,7 @@ export function BottomNav({ activeTab, onTabChange, shoppingListCount = 0 }: Bot
   const tabs = [
     { id: 'home', icon: Home, label: 'Home' },
     { id: 'inventory', icon: LayoutGrid, label: 'Inventory' },
-    { id: 'scan', icon: Camera, label: 'Scan' },
+    { id: 'scan', icon: Camera, label: 'Capture' },
     { id: 'shopping', icon: ShoppingCart, label: 'Shopping', badge: shoppingListCount },
     { id: 'settings', icon: Settings, label: 'Settings' },
   ];

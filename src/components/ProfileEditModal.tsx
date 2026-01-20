@@ -72,9 +72,8 @@ export function ProfileEditModal({
 
     setIsSaving(true);
     try {
-      await updateUserProfile(userId, {
+      await updateUserProfile({
         display_name: name.trim(),
-        ...(photoUrl && { profile_photo_url: photoUrl }),
       });
 
       toast.success('Profile updated successfully');

@@ -41,14 +41,14 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
     const user = await getCurrentUser();
     if (user) {
       setUserEmail(user.email || "");
-      setUserId((user as any).user_id || user.id);
+      setUserId(user.id);
       
-      // Get name from display_name or user_metadata
-      const name = (user as any).display_name || user.user_metadata?.name || user.email?.split('@')[0] || "User";
+      // Get name from display_name (comes from getCurrentUser which reads user_metadata)
+      const name = (user as any).display_name || "User";
       setUserName(name);
       
-      // Get profile photo if available
-      const photoUrl = (user as any).profile_photo_url;
+      // Get profile photo from user metadata if available
+      const photoUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture;
       setUserPhotoUrl(photoUrl);
       
       // Generate initials
@@ -60,16 +60,18 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
         .slice(0, 2);
       setUserInitials(initials || "U");
 
-      // Load user preferences
-      const publicUserId = (user as any).user_id;
-      if (publicUserId) {
-        const prefs = await getUserPreferences(publicUserId);
+      // Try to load user preferences (may not exist if table not created)
+      try {
+        const prefs = await getUserPreferences(user.id);
         if (prefs) {
           setPushNotifications(prefs.enable_push_notifications);
           setEmailNotifications(prefs.enable_email_notifications);
           setSpoilageAlertDays(prefs.spoilage_alert_advance_days || 3);
           setDarkMode(prefs.theme === 'dark');
         }
+      } catch (error) {
+        // Preferences table may not exist, that's okay
+        console.log('Could not load preferences, using defaults');
       }
     }
   };
@@ -79,12 +81,16 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
     setDarkMode(newDarkMode);
     document.documentElement.classList.toggle('dark');
     
-    // Save preference
+    // Save preference locally
+    localStorage.setItem('darkMode', newDarkMode ? 'true' : 'false');
+    
+    // Try to save to database (may not work if table doesn't exist)
     if (userId) {
       try {
         await updateUserPreferences(userId, { theme: newDarkMode ? 'dark' : 'light' });
       } catch (error) {
-        console.error('Error saving theme preference:', error);
+        // Silently fail - local storage will persist the preference
+        console.log('Could not save theme to database');
       }
     }
   };

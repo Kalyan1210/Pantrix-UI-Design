@@ -262,8 +262,7 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
             quantity: 1,
             category: productData.category,
             expiry_date: productData.estimatedExpiry,
-          },
-          (user as any).user_id
+          }
         );
         toast.success(`Successfully added ${productData.name} to inventory!`);
       } else {
@@ -275,7 +274,7 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
           price: item.price,
         }));
 
-        await addMultipleInventoryItems(user.id, itemsToAdd, (user as any).user_id);
+        await addMultipleInventoryItems(user.id, itemsToAdd);
         toast.success(`Successfully added ${itemsToAdd.length} items to inventory!`);
       }
       onComplete();
@@ -307,7 +306,7 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
             <Button variant="ghost" size="icon" onClick={onBack} className="text-white hover:bg-white/20">
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-xl text-white font-semibold">Scan Receipt or Product</h1>
+            <h1 className="text-xl text-white font-semibold">Capture</h1>
           </div>
         </div>
 
@@ -344,9 +343,12 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
 
               {/* Instructions Overlay */}
               <div className="absolute top-24 left-0 right-0 z-10 px-4">
-                <div className="max-w-md mx-auto bg-black/60 backdrop-blur-sm rounded-lg px-4 py-2">
-                  <p className="text-white text-center text-sm">
+                <div className="max-w-md mx-auto bg-black/60 backdrop-blur-sm rounded-lg px-4 py-3">
+                  <p className="text-white text-center text-sm font-medium">
                     📸 Position receipt or product in frame
+                  </p>
+                  <p className="text-white/70 text-center text-xs mt-1">
+                    Tap the white button below to capture
                   </p>
                 </div>
               </div>
@@ -355,36 +357,46 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
         </div>
 
         {/* Bottom Controls */}
-        <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/60 to-transparent pb-safe">
-          <div className="max-w-md mx-auto px-4 py-8 flex items-center justify-center gap-8">
-            {/* Gallery Button */}
-            <label className="w-12 h-12 rounded-full bg-white/20 border-2 border-white/40 text-white hover:bg-white/30 flex items-center justify-center cursor-pointer transition-colors">
-              <Upload className="w-5 h-5" />
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleGallerySelect}
-              />
-            </label>
+        <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent pb-safe">
+          <div className="max-w-md mx-auto px-4 py-6">
+            {/* Button labels row */}
+            <div className="flex items-center justify-center gap-8 mb-3">
+              <span className="text-white/80 text-xs w-12 text-center">Gallery</span>
+              <span className="text-white font-medium text-sm w-20 text-center">Capture</span>
+              <span className="text-white/80 text-xs w-12 text-center">Flip</span>
+            </div>
+            
+            {/* Buttons row */}
+            <div className="flex items-center justify-center gap-8">
+              {/* Gallery Button */}
+              <label className="w-14 h-14 rounded-full bg-white/20 border-2 border-white/50 text-white hover:bg-white/30 flex items-center justify-center cursor-pointer transition-colors">
+                <ImageIcon className="w-6 h-6" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleGallerySelect}
+                />
+              </label>
 
-            {/* Capture Button */}
-            <button
-              onClick={handleCapture}
-              disabled={hasPermission === false || !!cameraError}
-              className="w-20 h-20 rounded-full bg-white flex items-center justify-center shadow-xl hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <div className="w-16 h-16 rounded-full border-4 border-black/20" />
-            </button>
+              {/* Capture Button - Made more prominent */}
+              <button
+                onClick={handleCapture}
+                disabled={hasPermission === false || !!cameraError}
+                className="w-20 h-20 rounded-full bg-white flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed ring-4 ring-white/30"
+              >
+                <div className="w-16 h-16 rounded-full border-4 border-primary/50 bg-white" />
+              </button>
 
-            {/* Flip Camera Button */}
-            <button
-              onClick={flipCamera}
-              disabled={hasPermission === false || !!cameraError}
-              className="w-12 h-12 rounded-full bg-white/20 border-2 border-white/40 text-white hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <RotateCcw className="w-5 h-5" />
-            </button>
+              {/* Flip Camera Button */}
+              <button
+                onClick={flipCamera}
+                disabled={hasPermission === false || !!cameraError}
+                className="w-14 h-14 rounded-full bg-white/20 border-2 border-white/50 text-white hover:bg-white/30 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RotateCcw className="w-6 h-6" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

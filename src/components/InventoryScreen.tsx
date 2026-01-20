@@ -42,7 +42,7 @@ export function InventoryScreen({ onItemClick, onAddItem, initialFilter }: Inven
         return;
       }
 
-      const inventoryItems = await getInventoryItems(user.id, (user as any).user_id);
+      const inventoryItems = await getInventoryItems(user.id);
       setItems(inventoryItems);
     } catch (error: any) {
       console.error('Error loading inventory:', error);

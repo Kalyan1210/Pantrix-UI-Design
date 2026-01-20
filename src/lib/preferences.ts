@@ -5,19 +5,7 @@ export interface UserPreferences {
   enable_push_notifications: boolean;
   enable_email_notifications: boolean;
   spoilage_alert_advance_days: number;
-  quiet_hours_start?: string;
-  quiet_hours_end?: string;
-  default_store?: string;
-  dietary_restrictions?: string[];
-  preferred_cuisines?: string[];
-  disliked_cuisines?: string[];
-  preferred_cook_time?: string;
-  skill_level?: string;
-  recipe_notifications: boolean;
-  notification_time?: string;
-  weekend_brunch_suggestions: boolean;
   theme: 'system' | 'light' | 'dark';
-  default_household_id?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -33,7 +21,7 @@ export async function getUserPreferences(userId: string): Promise<UserPreference
     if (error && error.code !== 'PGRST116') {
       // PGRST116 is "not found" which is okay
       console.error('Error fetching preferences:', error);
-      throw error;
+      return null;
     }
 
     return data;
@@ -46,7 +34,7 @@ export async function getUserPreferences(userId: string): Promise<UserPreference
 export async function updateUserPreferences(
   userId: string,
   preferences: Partial<UserPreferences>
-): Promise<UserPreferences> {
+): Promise<UserPreferences | null> {
   try {
     // Check if preferences exist
     const existing = await getUserPreferences(userId);
@@ -64,32 +52,48 @@ export async function updateUserPreferences(
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating preferences:', error);
+        return null;
+      }
       data = updated;
     } else {
-      // Create new preferences
+      // Create new preferences with defaults
+      const defaultPrefs = {
+        user_id: userId,
+        enable_push_notifications: true,
+        enable_email_notifications: false,
+        spoilage_alert_advance_days: 3,
+        theme: 'system' as const,
+        ...preferences,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
       const { data: created, error } = await supabase
         .from('user_preferences')
-        .insert({
-          user_id: userId,
-          ...preferences,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
+        .insert(defaultPrefs)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating preferences:', error);
+        return null;
+      }
       data = created;
     }
 
     return data;
   } catch (error) {
     console.error('Error updating preferences:', error);
-    throw error;
+    return null;
   }
 }
 
+/**
+ * Upload profile photo to Supabase Storage
+ * Returns the public URL of the uploaded photo
+ */
 export async function updateProfilePhoto(userId: string, file: File): Promise<string> {
   try {
     // Upload to Supabase Storage
@@ -99,7 +103,10 @@ export async function updateProfilePhoto(userId: string, file: File): Promise<st
 
     const { error: uploadError } = await supabase.storage
       .from('profile-photos')
-      .upload(filePath, file);
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true
+      });
 
     if (uploadError) throw uploadError;
 
@@ -108,13 +115,15 @@ export async function updateProfilePhoto(userId: string, file: File): Promise<st
       .from('profile-photos')
       .getPublicUrl(filePath);
 
-    // Update user record
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ profile_photo_url: publicUrl })
-      .eq('user_id', userId);
+    // Update user metadata via auth (this is the proper way without a public users table)
+    const { error: updateError } = await supabase.auth.updateUser({
+      data: { avatar_url: publicUrl }
+    });
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.warn('Could not update user metadata:', updateError);
+      // Still return the URL even if metadata update fails
+    }
 
     return publicUrl;
   } catch (error) {
@@ -123,18 +132,20 @@ export async function updateProfilePhoto(userId: string, file: File): Promise<st
   }
 }
 
+/**
+ * Update user profile (display name)
+ * Uses auth.updateUser to update user metadata
+ */
 export async function updateUserProfile(
-  userId: string,
-  updates: { display_name?: string; profile_photo_url?: string }
+  updates: { display_name?: string }
 ): Promise<void> {
   try {
-    const { error } = await supabase
-      .from('users')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('user_id', userId);
+    const { error } = await supabase.auth.updateUser({
+      data: { 
+        name: updates.display_name,
+        display_name: updates.display_name 
+      }
+    });
 
     if (error) throw error;
   } catch (error) {
@@ -142,4 +153,3 @@ export async function updateUserProfile(
     throw error;
   }
 }
-

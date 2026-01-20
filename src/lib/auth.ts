@@ -1,5 +1,45 @@
 import { supabase } from './supabase';
 
+// OAuth sign in with Google
+export async function signInWithGoogle() {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}`,
+    },
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+// OAuth sign in with Microsoft (Azure)
+export async function signInWithMicrosoft() {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'azure',
+    options: {
+      redirectTo: `${window.location.origin}`,
+      scopes: 'email profile openid',
+    },
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+// OAuth sign in with Apple
+export async function signInWithApple() {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'apple',
+    options: {
+      redirectTo: `${window.location.origin}`,
+    },
+  });
+
+  if (error) throw error;
+  return data;
+}
+
 export async function signUp(email: string, password: string, name?: string) {
   const displayName = name || email.split('@')[0];
   
@@ -9,34 +49,12 @@ export async function signUp(email: string, password: string, name?: string) {
     options: {
       data: {
         name: displayName,
+        display_name: displayName,
       },
     },
   });
 
   if (error) throw error;
-  
-  // Create user record in public.users table if auth signup succeeded
-  if (data.user) {
-    try {
-      const { error: userError } = await supabase
-        .from('users')
-        .insert({
-          email: email,
-          display_name: displayName,
-          auth_provider: 'email',
-          email_verified: false,
-        });
-      
-      if (userError) {
-        console.warn('Could not create user in public.users table:', userError);
-        // Don't throw - auth signup succeeded, user record creation can be handled by a trigger
-      }
-    } catch (err) {
-      console.warn('Error creating user record:', err);
-      // Don't throw - auth signup succeeded
-    }
-  }
-  
   return data;
 }
 
@@ -56,27 +74,25 @@ export async function signOut() {
 }
 
 export async function getCurrentUser() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  const { data: { user }, error } = await supabase.auth.getUser();
   
-  // Get the user_id from public.users table that matches auth.users
-  // Your schema uses public.users with user_id, not auth.users directly
-  const { data: publicUser } = await supabase
-    .from('users')
-    .select('user_id, email, display_name')
-    .eq('email', user.email)
-    .single();
-  
-  if (publicUser) {
-    // Return a combined user object with both auth and public user data
-    return {
-      ...user,
-      user_id: publicUser.user_id,
-      display_name: publicUser.display_name,
-    };
+  if (error) {
+    console.error('Error getting current user:', error);
+    return null;
   }
   
-  return user;
+  if (!user) return null;
+  
+  // Return user with display name from user_metadata
+  // This works for both email/password and OAuth users
+  return {
+    ...user,
+    display_name: user.user_metadata?.name || 
+                  user.user_metadata?.display_name || 
+                  user.user_metadata?.full_name ||
+                  user.email?.split('@')[0] || 
+                  'User',
+  };
 }
 
 export function onAuthStateChange(callback: (user: any) => void) {
@@ -84,4 +100,3 @@ export function onAuthStateChange(callback: (user: any) => void) {
     callback(session?.user ?? null);
   });
 }
-

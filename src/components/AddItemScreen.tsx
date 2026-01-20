@@ -64,7 +64,7 @@ export function AddItemScreen({ onBack, onSave, onScanBarcode }: AddItemScreenPr
       const categoryLower = category.toLowerCase();
 
       await addInventoryItem(
-        user.id, // auth user id
+        user.id,
         {
           name: itemName.trim(),
           quantity: quantity,
@@ -73,8 +73,7 @@ export function AddItemScreen({ onBack, onSave, onScanBarcode }: AddItemScreenPr
           purchase_date: purchaseDate,
           expiry_date: expiryDate || undefined,
           price: price ? parseFloat(price) : undefined,
-        },
-        (user as any).user_id // public user_id if available
+        }
       );
 
       toast.success('Item added to inventory!');
@@ -127,8 +126,8 @@ export function AddItemScreen({ onBack, onSave, onScanBarcode }: AddItemScreenPr
                   <Camera className="w-6 h-6 text-primary-foreground" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-medium mb-1 text-primary">Scan Receipt</h3>
-                  <p className="text-muted-foreground text-sm">Auto-fill items from your receipt</p>
+                  <h3 className="font-medium mb-1 text-primary">Capture Receipt or Product</h3>
+                  <p className="text-muted-foreground text-sm">Auto-fill items from your photo</p>
                 </div>
                 <ArrowLeft className="w-5 h-5 text-muted-foreground rotate-180" />
               </div>
