@@ -3,7 +3,7 @@ import { getLocationForCategory, estimateExpiryDate } from './anthropic';
 
 /**
  * Get all inventory items for the current user
- * Uses legacy column names (custom_name, storage_location, expected_expiry_date, item_id)
+ * Schema: item_id, custom_name, storage_location, expected_expiry_date, user_id, etc.
  */
 export async function getInventoryItems(authUserId: string): Promise<InventoryItemUI[]> {
   try {
@@ -11,6 +11,7 @@ export async function getInventoryItems(authUserId: string): Promise<InventoryIt
       .from('inventory_items')
       .select('*')
       .eq('user_id', authUserId)
+      .is('used_up_at', null) // Only get active items
       .order('expected_expiry_date', { ascending: true, nullsFirst: false });
 
     if (error) {
@@ -18,10 +19,9 @@ export async function getInventoryItems(authUserId: string): Promise<InventoryIt
       throw error;
     }
 
-    // Map database items to UI items - handle legacy column names
     return (data || []).map((item): InventoryItemUI => ({
-      id: item.item_id || item.id,
-      name: item.custom_name || item.name || 'Unnamed Item',
+      id: item.item_id,
+      name: item.custom_name || 'Unnamed Item',
       quantity: Number(item.quantity) || 1,
       category: item.category || 'other',
       location: (item.storage_location || item.location || 'pantry') as 'fridge' | 'freezer' | 'pantry' | 'counter',
@@ -39,7 +39,7 @@ export async function getInventoryItems(authUserId: string): Promise<InventoryIt
 
 /**
  * Add a single item to inventory
- * Uses ONLY legacy column names that exist in the database
+ * Using exact column names from your schema
  */
 export async function addInventoryItem(
   authUserId: string,
@@ -63,22 +63,26 @@ export async function addInventoryItem(
       expiryDate = estimated.toISOString().split('T')[0];
     }
 
-    // Use ONLY legacy column names that exist in the database
+    // Use EXACT column names from your schema
+    // NOT setting: household_id (nullable), added_by (FK to users table, not auth.users)
     const insertData = {
       user_id: authUserId,
-      household_id: authUserId,
       custom_name: item.name,
       quantity: item.quantity,
       category: item.category,
       storage_location: storageLocation,
+      location: storageLocation,
       purchase_date: item.purchase_date || new Date().toISOString().split('T')[0],
       expected_expiry_date: expiryDate,
+      expiry_date: expiryDate,
       price: item.price || null,
       image_url: item.image_url || null,
       input_method: 'manual',
       state: 'stocked',
-      added_by: authUserId,
+      // NOT setting added_by - it references users table, not auth.users
     };
+
+    console.log('Inserting item:', insertData);
 
     const { data, error } = await supabase
       .from('inventory_items')
@@ -92,11 +96,11 @@ export async function addInventoryItem(
     }
 
     return {
-      id: data.item_id || data.id,
-      name: data.custom_name || data.name || 'Unnamed Item',
+      id: data.item_id,
+      name: data.custom_name || 'Unnamed Item',
       quantity: Number(data.quantity),
       category: data.category,
-      location: (data.storage_location || data.location || 'pantry') as 'fridge' | 'freezer' | 'pantry' | 'counter',
+      location: (data.storage_location || 'pantry') as 'fridge' | 'freezer' | 'pantry' | 'counter',
       purchase_date: data.purchase_date,
       expiry_date: data.expected_expiry_date || data.expiry_date,
       price: data.price ? Number(data.price) : undefined,
@@ -132,22 +136,23 @@ export async function addMultipleInventoryItems(
         expiryDate = estimated.toISOString().split('T')[0];
       }
 
-      // Use ONLY legacy column names
       return {
         user_id: authUserId,
-        household_id: authUserId,
         custom_name: item.name,
         quantity: item.quantity,
         category: item.category,
         storage_location: storageLocation,
+        location: storageLocation,
         purchase_date: new Date().toISOString().split('T')[0],
         expected_expiry_date: expiryDate,
+        expiry_date: expiryDate,
         price: item.price || null,
         input_method: 'receipt_scan',
         state: 'stocked',
-        added_by: authUserId,
       };
     });
+
+    console.log('Inserting items:', itemsToInsert);
 
     const { data, error } = await supabase
       .from('inventory_items')
@@ -160,8 +165,8 @@ export async function addMultipleInventoryItems(
     }
 
     return (data || []).map((item): InventoryItemUI => ({
-      id: item.item_id || item.id,
-      name: item.custom_name || item.name || 'Unnamed Item',
+      id: item.item_id,
+      name: item.custom_name || 'Unnamed Item',
       quantity: Number(item.quantity),
       category: item.category,
       location: (item.storage_location || 'pantry') as 'fridge' | 'freezer' | 'pantry' | 'counter',
@@ -191,16 +196,19 @@ export async function updateInventoryItem(
   }>
 ): Promise<InventoryItemUI> {
   try {
-    // Map to legacy column names
-    const updateData: any = {
-      updated_at: new Date().toISOString(),
-    };
+    const updateData: any = {};
     
     if (updates.name !== undefined) updateData.custom_name = updates.name;
     if (updates.quantity !== undefined) updateData.quantity = updates.quantity;
     if (updates.category !== undefined) updateData.category = updates.category;
-    if (updates.location !== undefined) updateData.storage_location = updates.location;
-    if (updates.expiry_date !== undefined) updateData.expected_expiry_date = updates.expiry_date;
+    if (updates.location !== undefined) {
+      updateData.storage_location = updates.location;
+      updateData.location = updates.location;
+    }
+    if (updates.expiry_date !== undefined) {
+      updateData.expected_expiry_date = updates.expiry_date;
+      updateData.expiry_date = updates.expiry_date;
+    }
     if (updates.price !== undefined) updateData.price = updates.price;
 
     const { data, error } = await supabase
@@ -216,8 +224,8 @@ export async function updateInventoryItem(
     }
 
     return {
-      id: data.item_id || data.id,
-      name: data.custom_name || data.name || 'Unnamed Item',
+      id: data.item_id,
+      name: data.custom_name || 'Unnamed Item',
       quantity: Number(data.quantity),
       category: data.category,
       location: (data.storage_location || 'pantry') as 'fridge' | 'freezer' | 'pantry' | 'counter',
@@ -233,27 +241,22 @@ export async function updateInventoryItem(
 }
 
 /**
- * Delete an inventory item
+ * Delete (mark as used) an inventory item
  */
 export async function deleteInventoryItem(itemId: string): Promise<void> {
   try {
-    // Try with item_id first (legacy), then id
-    let { error } = await supabase
+    // Soft delete by setting used_up_at and state
+    const { error } = await supabase
       .from('inventory_items')
-      .delete()
+      .update({ 
+        state: 'used',
+        used_up_at: new Date().toISOString()
+      })
       .eq('item_id', itemId);
 
     if (error) {
-      // Fallback to 'id' column
-      const result = await supabase
-        .from('inventory_items')
-        .delete()
-        .eq('id', itemId);
-      
-      if (result.error) {
-        console.error('Error deleting inventory item:', result.error);
-        throw result.error;
-      }
+      console.error('Error deleting inventory item:', error);
+      throw error;
     }
   } catch (error: any) {
     console.error('Error in deleteInventoryItem:', error);
