@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { LoginScreen } from "./components/LoginScreen";
 import { SignUpScreen } from "./components/SignUpScreen";
@@ -18,6 +18,10 @@ import { NotificationsScreen } from "./components/NotificationsScreen";
 import { BottomNav } from "./components/BottomNav";
 import { Toaster } from "./components/ui/sonner";
 import { getCurrentUser, onAuthStateChange } from "./lib/auth";
+import { PageTransition } from "./components/ui/page-transition";
+import { hapticMedium, hapticSuccess } from "./lib/haptics";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { Download, X } from "lucide-react";
 // Loader2 removed - using custom emoji animation
 
 type Screen = 
@@ -44,6 +48,84 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [shoppingListCount, setShoppingListCount] = useState(0);
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  const previousScreen = useRef<Screen>('welcome');
+  const [transitionKey, setTransitionKey] = useState(0);
+  
+  // PWA Install Prompt
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  
+  // Listen for PWA install prompt
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      
+      // Only show if user hasn't dismissed it before
+      const dismissed = localStorage.getItem('pwa_install_dismissed');
+      if (!dismissed) {
+        // Delay showing the prompt
+        setTimeout(() => setShowInstallPrompt(true), 3000);
+      }
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+  
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    
+    hapticSuccess();
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      console.log('User accepted the install prompt');
+    }
+    
+    setDeferredPrompt(null);
+    setShowInstallPrompt(false);
+  };
+  
+  const dismissInstallPrompt = () => {
+    setShowInstallPrompt(false);
+    localStorage.setItem('pwa_install_dismissed', 'true');
+  };
+  
+  // Determine transition direction based on navigation
+  const getTransitionDirection = (from: Screen, to: Screen): 'left' | 'right' | 'bottom' | 'scale' => {
+    const mainScreens: Screen[] = ['home', 'inventory', 'scan', 'shopping', 'settings'];
+    const fromIndex = mainScreens.indexOf(from);
+    const toIndex = mainScreens.indexOf(to);
+    
+    // Going to sub-screens (detail, add, etc.)
+    if (['itemDetail', 'addItem', 'notifications', 'household', 'spoilageAlerts', 'recipes'].includes(to)) {
+      return 'right';
+    }
+    
+    // Coming back from sub-screens
+    if (['itemDetail', 'addItem', 'notifications', 'household', 'spoilageAlerts', 'recipes'].includes(from)) {
+      return 'left';
+    }
+    
+    // Navigating between main tabs
+    if (fromIndex >= 0 && toIndex >= 0) {
+      return toIndex > fromIndex ? 'right' : 'left';
+    }
+    
+    return 'scale';
+  };
+  
+  const navigateToScreen = (screen: Screen) => {
+    previousScreen.current = currentScreen;
+    setCurrentScreen(screen);
+    setTransitionKey(prev => prev + 1);
+    hapticMedium();
+  };
   
   // Load shopping list count from localStorage
   useEffect(() => {
@@ -100,30 +182,30 @@ export default function App() {
   }, []);
 
   const handleGetStarted = () => {
-    setCurrentScreen('login');
+    navigateToScreen('login');
   };
 
   const handleLogin = () => {
     setIsAuthenticated(true);
     if (!hasCompletedOnboarding) {
-      setCurrentScreen('onboarding');
+      navigateToScreen('onboarding');
     } else {
-      setCurrentScreen('home');
+      navigateToScreen('home');
     }
   };
 
   const handleSignUp = () => {
     // In a real app, this would navigate to a signup screen
     setIsAuthenticated(true);
-    setCurrentScreen('onboarding');
+    navigateToScreen('onboarding');
   };
 
   const handleShowSignUp = () => {
-    setCurrentScreen('signup');
+    navigateToScreen('signup');
   };
 
   const handleBackToLogin = () => {
-    setCurrentScreen('login');
+    navigateToScreen('login');
   };
 
   const handleOnboardingComplete = async () => {
@@ -147,15 +229,13 @@ export default function App() {
       case 'scan':
       case 'shopping':
       case 'settings':
-        setCurrentScreen(screen as Screen);
-        break;
       case 'spoilageAlerts':
       case 'recipes':
       case 'household':
       case 'itemDetail':
       case 'addItem':
       case 'notifications':
-        setCurrentScreen(screen as Screen);
+        navigateToScreen(screen as Screen);
         break;
     }
   };
@@ -163,99 +243,157 @@ export default function App() {
   const handleBack = () => {
     // Simple navigation back logic
     if (currentScreen === 'itemDetail' || currentScreen === 'addItem') {
-      setCurrentScreen('inventory');
+      navigateToScreen('inventory');
     } else if (currentScreen === 'household') {
-      setCurrentScreen('settings');
+      navigateToScreen('settings');
     } else if (currentScreen === 'spoilageAlerts' || currentScreen === 'recipes' || currentScreen === 'notifications') {
-      setCurrentScreen('home');
+      navigateToScreen('home');
     } else {
-      setCurrentScreen('home');
+      navigateToScreen('home');
     }
   };
 
   const renderScreen = () => {
+    const direction = getTransitionDirection(previousScreen.current, currentScreen);
+    
     if (!isAuthenticated) {
       switch (currentScreen) {
         case 'welcome':
-          return <WelcomeScreen onGetStarted={handleGetStarted} />;
+          return (
+            <PageTransition key={transitionKey} direction="scale">
+              <WelcomeScreen onGetStarted={handleGetStarted} />
+            </PageTransition>
+          );
         case 'login':
-          return <LoginScreen onLogin={handleLogin} onSignUp={handleShowSignUp} />;
+          return (
+            <PageTransition key={transitionKey} direction="right">
+              <LoginScreen onLogin={handleLogin} onSignUp={handleShowSignUp} />
+            </PageTransition>
+          );
         case 'signup':
-          return <SignUpScreen onSignUp={handleSignUp} onBack={handleBackToLogin} />;
+          return (
+            <PageTransition key={transitionKey} direction="right">
+              <SignUpScreen onSignUp={handleSignUp} onBack={handleBackToLogin} />
+            </PageTransition>
+          );
         default:
-          return <WelcomeScreen onGetStarted={handleGetStarted} />;
+          return (
+            <PageTransition key={transitionKey} direction="scale">
+              <WelcomeScreen onGetStarted={handleGetStarted} />
+            </PageTransition>
+          );
       }
     }
 
     if (currentScreen === 'onboarding') {
-      return <OnboardingCarousel onComplete={handleOnboardingComplete} />;
+      return (
+        <PageTransition key={transitionKey} direction="scale">
+          <OnboardingCarousel onComplete={handleOnboardingComplete} />
+        </PageTransition>
+      );
     }
 
     switch (currentScreen) {
       case 'home':
-        return <HomeScreen onNavigate={handleNavigate} />;
+        return (
+          <PageTransition key={transitionKey} direction={direction}>
+            <HomeScreen onNavigate={handleNavigate} />
+          </PageTransition>
+        );
       case 'inventory':
         return (
-          <InventoryScreen
-            onItemClick={(item) => {
-              setSelectedItem(item);
-              handleNavigate('itemDetail');
-            }}
-            onAddItem={() => handleNavigate('addItem')}
-            initialFilter={inventoryFilter}
-          />
+          <PageTransition key={transitionKey} direction={direction}>
+            <InventoryScreen
+              onItemClick={(item) => {
+                setSelectedItem(item);
+                handleNavigate('itemDetail');
+              }}
+              onAddItem={() => handleNavigate('addItem')}
+              initialFilter={inventoryFilter}
+            />
+          </PageTransition>
         );
       case 'itemDetail':
         return (
-          <ItemDetailScreen
-            item={selectedItem}
-            onBack={handleBack}
-            onDelete={() => {
-              // Toast notification would go here
-              handleBack();
-            }}
-            onAddToShoppingList={() => {
-              // Toast notification would go here
-              handleBack();
-            }}
-          />
+          <PageTransition key={transitionKey} direction="right">
+            <ItemDetailScreen
+              item={selectedItem}
+              onBack={handleBack}
+              onDelete={() => {
+                // Toast notification would go here
+                handleBack();
+              }}
+              onAddToShoppingList={() => {
+                // Toast notification would go here
+                handleBack();
+              }}
+            />
+          </PageTransition>
         );
       case 'addItem':
         return (
-          <AddItemScreen
-            onBack={handleBack}
-            onSave={() => {
-              // Toast notification would go here
-              handleBack();
-            }}
-            onScanBarcode={() => handleNavigate('scan')}
-          />
+          <PageTransition key={transitionKey} direction="right">
+            <AddItemScreen
+              onBack={handleBack}
+              onSave={() => {
+                // Toast notification would go here
+                handleBack();
+              }}
+              onScanBarcode={() => handleNavigate('scan')}
+            />
+          </PageTransition>
         );
       case 'scan':
         return (
-          <ReceiptScanScreen
-            onBack={handleBack}
-            onComplete={() => handleNavigate('inventory')}
-          />
+          <PageTransition key={transitionKey} direction="bottom">
+            <ReceiptScanScreen
+              onBack={handleBack}
+              onComplete={() => handleNavigate('inventory')}
+            />
+          </PageTransition>
         );
       case 'shopping':
-        return <ShoppingListScreen onAddItem={() => handleNavigate('addItem')} />;
+        return (
+          <PageTransition key={transitionKey} direction={direction}>
+            <ShoppingListScreen onAddItem={() => handleNavigate('addItem')} />
+          </PageTransition>
+        );
       case 'settings':
         return (
-          <SettingsScreen onNavigateToHousehold={() => handleNavigate('household')} />
+          <PageTransition key={transitionKey} direction={direction}>
+            <SettingsScreen onNavigateToHousehold={() => handleNavigate('household')} />
+          </PageTransition>
         );
       case 'household':
-        return <HouseholdScreen onBack={handleBack} />;
+        return (
+          <PageTransition key={transitionKey} direction="right">
+            <HouseholdScreen onBack={handleBack} />
+          </PageTransition>
+        );
       case 'spoilageAlerts':
         return (
-          <SpoilageAlertsScreen onViewRecipes={() => handleNavigate('recipes')} />
+          <PageTransition key={transitionKey} direction="right">
+            <SpoilageAlertsScreen onViewRecipes={() => handleNavigate('recipes')} />
+          </PageTransition>
         );
       case 'recipes':
-        return <RecipesScreen onBack={handleBack} />;
+        return (
+          <PageTransition key={transitionKey} direction="right">
+            <RecipesScreen onBack={handleBack} />
+          </PageTransition>
+        );
       case 'notifications':
-        return <NotificationsScreen onBack={handleBack} />;
+        return (
+          <PageTransition key={transitionKey} direction="right">
+            <NotificationsScreen onBack={handleBack} />
+          </PageTransition>
+        );
       default:
-        return <HomeScreen onNavigate={handleNavigate} />;
+        return (
+          <PageTransition key={transitionKey} direction="scale">
+            <HomeScreen onNavigate={handleNavigate} />
+          </PageTransition>
+        );
     }
   };
 
@@ -353,26 +491,57 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Mobile Viewport Container - Max width for mobile app feel */}
-      <div className="max-w-md mx-auto min-h-screen bg-background shadow-xl">
-        {/* Main Content */}
-        <div className="relative">
-          {renderScreen()}
+    <ErrorBoundary>
+      <div className="min-h-screen bg-background">
+        {/* PWA Install Banner */}
+        {showInstallPrompt && (
+          <div className="fixed top-0 left-0 right-0 z-50 animate-slide-in-bottom">
+            <div className="max-w-md mx-auto">
+              <div className="m-4 p-4 rounded-xl bg-gradient-to-r from-primary to-accent text-white shadow-lg flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                  <Download className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium">Install Pantrix</p>
+                  <p className="text-sm text-white/80">Add to home screen for the best experience</p>
+                </div>
+                <button 
+                  onClick={handleInstallClick}
+                  className="px-4 py-2 rounded-lg bg-white text-primary font-medium text-sm touch-feedback"
+                >
+                  Install
+                </button>
+                <button 
+                  onClick={dismissInstallPrompt}
+                  className="p-2 rounded-lg hover:bg-white/20 touch-feedback"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Viewport Container - Max width for mobile app feel */}
+        <div className="max-w-md mx-auto min-h-screen bg-background shadow-xl">
+          {/* Main Content */}
+          <div className="relative">
+            {renderScreen()}
+          </div>
+
+          {/* Bottom Navigation */}
+          {showBottomNav && (
+            <BottomNav
+              activeTab={currentScreen}
+              onTabChange={(tab) => handleNavigate(tab)}
+              shoppingListCount={shoppingListCount}
+            />
+          )}
         </div>
 
-        {/* Bottom Navigation */}
-        {showBottomNav && (
-          <BottomNav
-            activeTab={currentScreen}
-            onTabChange={(tab) => handleNavigate(tab)}
-            shoppingListCount={shoppingListCount}
-          />
-        )}
+        {/* Toast Notifications */}
+        <Toaster />
       </div>
-
-      {/* Toast Notifications */}
-      <Toaster />
-    </div>
+    </ErrorBoundary>
   );
 }
