@@ -26,20 +26,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'Anthropic API key not configured' });
     }
 
+    // Detect media type from base64 data
+    const mediaType = getMediaType(imageBase64);
+
     // Get today's date for expiry calculation
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
     const prompt = `TODAY'S DATE: ${todayStr}
 
-Analyze this image and determine if it's a grocery receipt or food/grocery product(s).
+You are analyzing an image for a GROCERY/PANTRY management app called Pantrix.
 
-IMPORTANT INSTRUCTIONS:
-1. COUNT the actual number of items visible in the image carefully
-2. Calculate expiry dates from TODAY (${todayStr}), not arbitrary past dates
-3. Use typical shelf life: produce (5-7 days), dairy (7-14 days), meat (3-5 days), bakery (5-7 days), frozen (30+ days), canned (1+ year)
+FIRST: Determine what type of image this is:
+- If it's a grocery RECEIPT → extract food items
+- If it's FOOD/GROCERY products → identify them and count quantity
+- If it's NEITHER (person, selfie, random object, document, screenshot, etc.) → return "unknown"
 
-If it's a RECEIPT, extract all food/grocery items:
+IMPORTANT RULES:
+1. COUNT the actual number of food items visible (e.g., 3 apples, 2 bananas)
+2. Calculate expiry dates from TODAY (${todayStr}) using typical shelf life
+3. Be STRICT - if it's not clearly food or a receipt, return "unknown"
+
+SHELF LIFE GUIDE:
+- Produce (fruits/vegetables): 5-7 days
+- Dairy (milk, cheese, yogurt): 7-14 days
+- Meat/Poultry: 3-5 days
+- Bakery (bread, pastries): 5-7 days
+- Frozen items: 30-90 days
+- Canned goods: 1+ year
+- Beverages: 7-30 days
+
+---
+
+If it's a RECEIPT with grocery items:
 {
   "type": "receipt",
   "receiptData": {
@@ -58,30 +77,37 @@ If it's a RECEIPT, extract all food/grocery items:
   }
 }
 
-If it's a PRODUCT or PRODUCTS, identify what you see:
+---
+
+If it's FOOD PRODUCTS (actual groceries/food items):
 {
   "type": "product",
   "productData": {
-    "name": "Product name (e.g., Apples, Bananas, Milk)",
+    "name": "Product name (e.g., Apple, Banana, Milk carton)",
     "brand": "Brand if visible",
-    "quantity": <COUNT THE ACTUAL NUMBER OF ITEMS IN THE IMAGE>,
+    "quantity": <ACTUAL COUNT of items in image - look carefully!>,
     "category": "dairy|produce|meat|bakery|frozen|beverages|snacks|canned|condiments|grains|other",
-    "estimatedExpiry": "YYYY-MM-DD (calculate from ${todayStr} + typical shelf life)",
+    "estimatedExpiry": "YYYY-MM-DD",
     "confidence": "high|medium|low"
   }
 }
 
-EXAMPLES of correct expiry calculation from today (${todayStr}):
-- Apples: ${addDays(today, 7)} (7 days)
-- Milk: ${addDays(today, 10)} (10 days)
-- Chicken: ${addDays(today, 3)} (3 days)
-- Bread: ${addDays(today, 5)} (5 days)
+---
 
-If you cannot identify the image:
+If it's NOT food/groceries or receipt (person, selfie, object, document, screenshot, pet, landscape, etc.):
 {
   "type": "unknown",
-  "error": "Could not identify as receipt or product"
+  "error": "<Friendly message explaining what you see and asking for food/receipt>",
+  "detected": "person|selfie|document|object|screenshot|unclear|other"
 }
+
+EXAMPLES of "unknown" responses:
+- Selfie/face: {"type": "unknown", "error": "I see a person, but I need a photo of food items or a grocery receipt to help you track your pantry!", "detected": "selfie"}
+- Random object: {"type": "unknown", "error": "That doesn't look like food. Please take a photo of groceries or a shopping receipt.", "detected": "object"}
+- Blurry image: {"type": "unknown", "error": "The image is too blurry to identify. Please take a clearer photo.", "detected": "unclear"}
+- Document/text: {"type": "unknown", "error": "This looks like a document but not a grocery receipt. Please upload a shopping receipt or photo of food.", "detected": "document"}
+
+---
 
 Return ONLY valid JSON, no other text.`;
 
@@ -103,7 +129,7 @@ Return ONLY valid JSON, no other text.`;
                 type: 'image',
                 source: {
                   type: 'base64',
-                  media_type: 'image/jpeg',
+                  media_type: mediaType,
                   data: imageBase64,
                 },
               },
@@ -153,7 +179,6 @@ Return ONLY valid JSON, no other text.`;
     if (result.type === 'product' && result.productData?.estimatedExpiry) {
       const expiry = new Date(result.productData.estimatedExpiry);
       if (expiry < today) {
-        // Expiry is in past, recalculate based on category
         const daysToAdd = getShelfLifeDays(result.productData.category);
         result.productData.estimatedExpiry = addDays(today, daysToAdd);
       }
@@ -171,14 +196,33 @@ Return ONLY valid JSON, no other text.`;
   }
 }
 
-// Helper function to add days to a date
+/**
+ * Detect media type from base64 data signature
+ */
+function getMediaType(base64: string): string {
+  // Check first few characters of base64 for file signature
+  if (base64.startsWith('/9j/')) return 'image/jpeg';
+  if (base64.startsWith('iVBORw')) return 'image/png';
+  if (base64.startsWith('R0lGOD')) return 'image/gif';
+  if (base64.startsWith('UklGR')) return 'image/webp';
+  if (base64.startsWith('AAAA')) return 'image/heic'; // HEIC/HEIF
+  
+  // Default to JPEG as it's most common
+  return 'image/jpeg';
+}
+
+/**
+ * Add days to a date and return YYYY-MM-DD string
+ */
 function addDays(date: Date, days: number): string {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
   return result.toISOString().split('T')[0];
 }
 
-// Get typical shelf life in days based on category
+/**
+ * Get typical shelf life in days based on category
+ */
 function getShelfLifeDays(category: string): number {
   const shelfLife: Record<string, number> = {
     produce: 7,

@@ -129,6 +129,22 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'];
+    const isValidType = validTypes.includes(file.type.toLowerCase()) || file.type.startsWith('image/');
+    
+    if (!isValidType) {
+      toast.error('Please select an image file (JPEG, PNG, etc.)');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      toast.error('Image is too large. Please use an image under 10MB.');
+      return;
+    }
+
     try {
       // Show preview
       const reader = new FileReader();
