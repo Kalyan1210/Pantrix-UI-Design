@@ -26,10 +26,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'Anthropic API key not configured' });
     }
 
-    // Detect if it's a receipt or product
-    const prompt = `Analyze this image and determine if it's a grocery receipt or a food/grocery product.
+    // Get today's date for expiry calculation
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
 
-If it's a RECEIPT, extract all food/grocery items and return JSON like:
+    const prompt = `TODAY'S DATE: ${todayStr}
+
+Analyze this image and determine if it's a grocery receipt or food/grocery product(s).
+
+IMPORTANT INSTRUCTIONS:
+1. COUNT the actual number of items visible in the image carefully
+2. Calculate expiry dates from TODAY (${todayStr}), not arbitrary past dates
+3. Use typical shelf life: produce (5-7 days), dairy (7-14 days), meat (3-5 days), bakery (5-7 days), frozen (30+ days), canned (1+ year)
+
+If it's a RECEIPT, extract all food/grocery items:
 {
   "type": "receipt",
   "receiptData": {
@@ -48,19 +58,26 @@ If it's a RECEIPT, extract all food/grocery items and return JSON like:
   }
 }
 
-If it's a PRODUCT, identify the product and return JSON like:
+If it's a PRODUCT or PRODUCTS, identify what you see:
 {
   "type": "product",
   "productData": {
-    "name": "Product name",
+    "name": "Product name (e.g., Apples, Bananas, Milk)",
     "brand": "Brand if visible",
+    "quantity": <COUNT THE ACTUAL NUMBER OF ITEMS IN THE IMAGE>,
     "category": "dairy|produce|meat|bakery|frozen|beverages|snacks|canned|condiments|grains|other",
-    "estimatedExpiry": "YYYY-MM-DD (estimate based on typical shelf life)",
+    "estimatedExpiry": "YYYY-MM-DD (calculate from ${todayStr} + typical shelf life)",
     "confidence": "high|medium|low"
   }
 }
 
-If you cannot identify the image as either, return:
+EXAMPLES of correct expiry calculation from today (${todayStr}):
+- Apples: ${addDays(today, 7)} (7 days)
+- Milk: ${addDays(today, 10)} (10 days)
+- Chicken: ${addDays(today, 3)} (3 days)
+- Bread: ${addDays(today, 5)} (5 days)
+
+If you cannot identify the image:
 {
   "type": "unknown",
   "error": "Could not identify as receipt or product"
@@ -111,16 +128,13 @@ Return ONLY valid JSON, no other text.`;
 
     const data = await response.json();
     
-    // Extract the text content from Claude's response
     const textContent = data.content?.find((c: any) => c.type === 'text');
     if (!textContent?.text) {
       return res.status(500).json({ error: 'No text response from Claude' });
     }
 
-    // Parse the JSON from Claude's response
     let result;
     try {
-      // Try to extract JSON from the response (in case there's extra text)
       const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         result = JSON.parse(jsonMatch[0]);
@@ -135,7 +149,16 @@ Return ONLY valid JSON, no other text.`;
       });
     }
 
-    // Set CORS headers
+    // Validate and fix expiry date if it's in the past
+    if (result.type === 'product' && result.productData?.estimatedExpiry) {
+      const expiry = new Date(result.productData.estimatedExpiry);
+      if (expiry < today) {
+        // Expiry is in past, recalculate based on category
+        const daysToAdd = getShelfLifeDays(result.productData.category);
+        result.productData.estimatedExpiry = addDays(today, daysToAdd);
+      }
+    }
+
     res.setHeader('Access-Control-Allow-Origin', '*');
     return res.status(200).json(result);
 
@@ -148,3 +171,27 @@ Return ONLY valid JSON, no other text.`;
   }
 }
 
+// Helper function to add days to a date
+function addDays(date: Date, days: number): string {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result.toISOString().split('T')[0];
+}
+
+// Get typical shelf life in days based on category
+function getShelfLifeDays(category: string): number {
+  const shelfLife: Record<string, number> = {
+    produce: 7,
+    dairy: 10,
+    meat: 4,
+    bakery: 5,
+    frozen: 60,
+    beverages: 30,
+    snacks: 90,
+    canned: 365,
+    condiments: 180,
+    grains: 180,
+    other: 14,
+  };
+  return shelfLife[category?.toLowerCase()] || 14;
+}

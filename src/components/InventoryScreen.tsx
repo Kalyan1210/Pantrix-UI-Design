@@ -9,6 +9,7 @@ import { getInventoryItems, calculateDaysUntilExpiry, deleteInventoryItem } from
 import { getCurrentUser } from "../lib/auth";
 import { InventoryItemUI } from "../lib/supabase";
 import { toast } from "sonner";
+import { getItemIcon } from "../lib/category-icons";
 
 interface InventoryScreenProps {
   onItemClick: (item: InventoryItemUI) => void;
@@ -119,7 +120,7 @@ export function InventoryScreen({ onItemClick, onAddItem, initialFilter }: Inven
         {items.map((item) => {
           const daysUntilExpiry = calculateDaysUntilExpiry(item.expiry_date);
           const urgency = getUrgencyBadge(daysUntilExpiry);
-          const LocationIcon = locationIcons[item.location];
+          const itemIcon = getItemIcon(item.name, item.category);
           
           return (
             <Card
@@ -128,7 +129,7 @@ export function InventoryScreen({ onItemClick, onAddItem, initialFilter }: Inven
               onClick={() => onItemClick(item)}
             >
               <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                {LocationIcon && <LocationIcon className="w-6 h-6 text-muted-foreground" />}
+                <span className="text-2xl">{itemIcon}</span>
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">

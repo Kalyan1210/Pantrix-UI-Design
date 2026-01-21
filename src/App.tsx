@@ -43,6 +43,7 @@ export default function App() {
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [shoppingListCount, setShoppingListCount] = useState(0);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
   
   // Load shopping list count from localStorage
   useEffect(() => {
@@ -196,7 +197,10 @@ export default function App() {
       case 'inventory':
         return (
           <InventoryScreen
-            onItemClick={() => handleNavigate('itemDetail')}
+            onItemClick={(item) => {
+              setSelectedItem(item);
+              handleNavigate('itemDetail');
+            }}
             onAddItem={() => handleNavigate('addItem')}
             initialFilter={inventoryFilter}
           />
@@ -204,6 +208,7 @@ export default function App() {
       case 'itemDetail':
         return (
           <ItemDetailScreen
+            item={selectedItem}
             onBack={handleBack}
             onDelete={() => {
               // Toast notification would go here

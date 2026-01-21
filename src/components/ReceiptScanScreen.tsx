@@ -195,11 +195,11 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
       } else if (result.type === 'product' && result.productData) {
         setScanType('product');
         setProductData(result.productData);
-        // Convert product to a single item for review
+        // Convert product to a single item for review - use quantity from API
         const item: ReceiptItem = {
           id: `product-${Date.now()}`,
           name: result.productData.name,
-          quantity: 1,
+          quantity: result.productData.quantity || 1, // Use detected quantity
           price: 0,
           category: result.productData.category || 'other',
           confidence: result.productData.confidence || 'medium',
