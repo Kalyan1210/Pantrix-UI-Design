@@ -152,7 +152,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       </div>
 
       {/* Quick Actions */}
-      <div className="mb-6 animate-fade-in" style={{ animationDelay: '0.2s', animationFillMode: 'forwards', opacity: 0 }}>
+      <div className="mb-6">
         <h2 className="mb-3">Quick Actions</h2>
         <div className="grid grid-cols-3 gap-3">
           <button
@@ -180,7 +180,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       </div>
 
       {/* Getting Started / Recent Activity */}
-      <div className="animate-fade-in" style={{ animationDelay: '0.3s', animationFillMode: 'forwards', opacity: 0 }}>
+      <div>
         <div className="flex items-center justify-between mb-3">
           <h2>{hasItems ? 'Your Pantry' : 'Get Started'}</h2>
           {hasItems && (
@@ -243,8 +243,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       {/* Recipe Suggestions Card - When user has items */}
       {hasItems && (
         <Card 
-          className="mt-6 p-4 bg-gradient-to-r from-secondary/10 to-primary/10 cursor-pointer card-interactive animate-fade-in"
-          style={{ animationDelay: '0.4s', animationFillMode: 'forwards', opacity: 0 }}
+          className="mt-6 p-4 bg-gradient-to-r from-secondary/10 to-primary/10 cursor-pointer card-interactive"
           onClick={() => {
             hapticLight();
             onNavigate('recipes');
@@ -266,8 +265,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       {/* Achievement Badge - Only show when user has items */}
       {hasItems && stats[2].value >= 5 && (
         <Card 
-          className="mt-4 p-4 bg-gradient-to-r from-primary/10 to-accent/10 animate-scale-in"
-          style={{ animationDelay: '0.5s', animationFillMode: 'forwards', opacity: 0 }}
+          className="mt-4 p-4 bg-gradient-to-r from-primary/10 to-accent/10"
         >
           <div className="flex items-start gap-3">
             <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center flex-shrink-0">

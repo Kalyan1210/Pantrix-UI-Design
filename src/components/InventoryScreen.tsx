@@ -200,8 +200,7 @@ export function InventoryScreen({ onItemClick, onAddItem, initialFilter }: Inven
           return (
             <div 
               key={item.id}
-              className={`relative overflow-hidden animate-slide-in-bottom stagger-${Math.min(index + 1, 8)}`}
-              style={{ animationFillMode: 'forwards', opacity: 0 }}
+              className="relative overflow-hidden"
             >
               {/* Swipe action backgrounds */}
               <div className="absolute inset-0 flex">
