@@ -1,16 +1,16 @@
-import { useState, useEffect, useRef } from "react";
-import { Search, Plus, Filter, Refrigerator, Package, Snowflake, Apple, Loader2, ArrowUpDown, ShoppingCart, Trash2, ChevronRight } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, Plus, Refrigerator, Package, Snowflake, Apple, ArrowUpDown, ChevronRight } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { Badge } from "./ui/badge";
 import { Card } from "./ui/card";
-import { getInventoryItems, calculateDaysUntilExpiry, deleteInventoryItem } from "../lib/inventory";
+import { getInventoryItems, calculateDaysUntilExpiry } from "../lib/inventory";
 import { getCurrentUser } from "../lib/auth";
 import { InventoryItemUI } from "../lib/supabase";
 import { toast } from "sonner";
 import { getItemIcon } from "../lib/category-icons";
-import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess } from "../lib/haptics";
+import { hapticLight, hapticMedium } from "../lib/haptics";
 import { ListSkeleton } from "./ui/skeleton-loader";
 
 interface InventoryScreenProps {
@@ -29,9 +29,6 @@ export function InventoryScreen({ onItemClick, onAddItem, initialFilter }: Inven
   const [activeTab, setActiveTab] = useState("all");
   const [sortBy, setSortBy] = useState<SortOption>('expiry');
   const [showSortMenu, setShowSortMenu] = useState(false);
-  const [swipedItem, setSwipedItem] = useState<string | null>(null);
-  const touchStartX = useRef(0);
-  const touchCurrentX = useRef(0);
 
   useEffect(() => {
     loadItems();
@@ -119,49 +116,6 @@ export function InventoryScreen({ onItemClick, onAddItem, initialFilter }: Inven
     });
   };
 
-  // Handle swipe for delete/add to shopping list
-  const handleTouchStart = (e: React.TouchEvent, itemId: string) => {
-    touchStartX.current = e.touches[0].clientX;
-    setSwipedItem(itemId);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    touchCurrentX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = async (item: InventoryItemUI) => {
-    const diff = touchStartX.current - touchCurrentX.current;
-    
-    if (diff > 80) {
-      // Swiped left - delete
-      hapticHeavy();
-      try {
-        await deleteInventoryItem(item.id!);
-        setItems(prev => prev.filter(i => i.id !== item.id));
-        toast.success(`${item.name} deleted`);
-      } catch (error) {
-        toast.error('Failed to delete item');
-      }
-    } else if (diff < -80) {
-      // Swiped right - add to shopping list
-      hapticSuccess();
-      const existingList = JSON.parse(localStorage.getItem('shopping_list_items') || '[]');
-      const newItem = {
-        id: Date.now().toString(),
-        name: item.name,
-        quantity: '1',
-        completed: false,
-        addedAt: new Date().toISOString()
-      };
-      localStorage.setItem('shopping_list_items', JSON.stringify([...existingList, newItem]));
-      toast.success(`${item.name} added to shopping list`);
-    }
-    
-    setSwipedItem(null);
-    touchStartX.current = 0;
-    touchCurrentX.current = 0;
-  };
-
   const sortOptions: { value: SortOption; label: string }[] = [
     { value: 'expiry', label: 'Expiry Date' },
     { value: 'name', label: 'Name' },
@@ -198,61 +152,37 @@ export function InventoryScreen({ onItemClick, onAddItem, initialFilter }: Inven
           const isExpired = daysUntilExpiry !== null && daysUntilExpiry <= 0;
           
           return (
-            <div 
+            <Card
               key={item.id}
-              className="relative overflow-hidden"
+              className={`p-4 flex items-center gap-3 cursor-pointer hover:bg-muted/50 transition-colors ${
+                isExpired ? 'border-destructive/30 opacity-75' : ''
+              }`}
+              onClick={() => {
+                hapticLight();
+                onItemClick(item);
+              }}
             >
-              {/* Swipe action backgrounds */}
-              <div className="absolute inset-0 flex">
-                <div className="w-1/2 bg-primary/20 flex items-center pl-4">
-                  <ShoppingCart className="w-5 h-5 text-primary" />
-                  <span className="ml-2 text-sm text-primary font-medium">Add to list</span>
+              <div className={`w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0`}>
+                <span className="text-2xl">{itemIcon}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className={`truncate font-medium ${isExpired ? 'line-through text-muted-foreground' : ''}`}>{item.name}</h3>
+                  <span className="text-muted-foreground text-sm">×{item.quantity}</span>
                 </div>
-                <div className="w-1/2 bg-destructive/20 flex items-center justify-end pr-4">
-                  <span className="mr-2 text-sm text-destructive font-medium">Delete</span>
-                  <Trash2 className="w-5 h-5 text-destructive" />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant={urgency.variant} className={urgency.color}>
+                    {urgency.label}
+                  </Badge>
+                  {item.category && (
+                    <Badge variant="outline" className="text-xs">
+                      {item.category}
+                    </Badge>
+                  )}
                 </div>
               </div>
-              
-              {/* Main card */}
-              <Card
-                className={`p-4 flex items-center gap-3 transition-all cursor-pointer relative bg-card ${
-                  isExpired ? 'border-destructive/30' : ''
-                }`}
-                style={{
-                  transform: swipedItem === item.id ? `translateX(${touchStartX.current - touchCurrentX.current > 0 ? -Math.min(touchStartX.current - touchCurrentX.current, 100) : Math.min(touchCurrentX.current - touchStartX.current, 100)}px)` : 'translateX(0)',
-                  transition: swipedItem === item.id ? 'none' : 'transform 0.3s ease'
-                }}
-                onClick={() => {
-                  hapticLight();
-                  onItemClick(item);
-                }}
-                onTouchStart={(e) => handleTouchStart(e, item.id!)}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={() => handleTouchEnd(item)}
-              >
-                <div className={`w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 ${isExpired ? 'opacity-60' : ''}`}>
-                  <span className="text-2xl">{itemIcon}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className={`truncate font-medium ${isExpired ? 'line-through text-muted-foreground' : ''}`}>{item.name}</h3>
-                    <span className="text-muted-foreground text-sm">×{item.quantity}</span>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant={urgency.variant} className={urgency.color}>
-                      {urgency.label}
-                    </Badge>
-                    {item.category && (
-                      <Badge variant="outline" className="text-xs">
-                        {item.category}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-              </Card>
-            </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+            </Card>
           );
         })}
       </div>
@@ -351,12 +281,6 @@ export function InventoryScreen({ onItemClick, onAddItem, initialFilter }: Inven
           </Button>
         </div>
         
-        {/* Swipe hint - show only on first visit */}
-        {items.length > 0 && !localStorage.getItem('swipe_hint_shown') && (
-          <p className="text-xs text-muted-foreground mt-2 text-center animate-fade-in">
-            💡 Swipe left to delete, right to add to shopping list
-          </p>
-        )}
       </div>
 
       {/* Storage Location Tabs */}
@@ -406,10 +330,9 @@ export function InventoryScreen({ onItemClick, onAddItem, initialFilter }: Inven
       <button
         onClick={() => {
           hapticMedium();
-          localStorage.setItem('swipe_hint_shown', 'true');
           onAddItem();
         }}
-        className="fixed bottom-20 right-4 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:scale-110 active:scale-95 transition-transform z-40 animate-pulse-glow"
+        className="fixed bottom-20 right-4 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:scale-110 active:scale-95 transition-transform z-40"
         aria-label="Add item"
       >
         <Plus className="w-6 h-6" />
