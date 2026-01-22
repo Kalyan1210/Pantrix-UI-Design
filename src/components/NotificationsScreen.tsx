@@ -180,14 +180,10 @@ export function NotificationsScreen({ onBack }: NotificationsScreenProps) {
     return (
       <div
         key={notification.id}
-        className={`p-4 flex items-start gap-3 hover:bg-muted/50 transition-all cursor-pointer animate-slide-in-bottom ${
+        className={`p-4 flex items-start gap-3 hover:bg-muted/50 transition-all cursor-pointer ${
           !notification.read ? 'bg-primary/5' : ''
         }`}
-        style={{ 
-          animationDelay: `${index * 50}ms`,
-          animationFillMode: 'forwards',
-          opacity: 0
-        }}
+        style={{ animationDelay: `${index * 50}ms` }}
       >
         <div className={`w-10 h-10 rounded-full ${bgColor} flex items-center justify-center flex-shrink-0`}>
           <Icon className={`w-5 h-5 ${color}`} />

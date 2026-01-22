@@ -316,14 +316,10 @@ export function RecipesScreen({ onBack }: RecipesScreenProps) {
             {recipes.map((recipe, index) => (
               <Card 
                 key={recipe.id} 
-                className={`overflow-hidden animate-slide-in-bottom card-interactive ${
+                className={`overflow-hidden card-interactive ${
                   recipe.usesExpiring ? 'ring-2 ring-secondary/30' : ''
                 }`}
-                style={{ 
-                  animationDelay: `${index * 100}ms`,
-                  animationFillMode: 'forwards',
-                  opacity: 0
-                }}
+                style={{ animationDelay: `${index * 100}ms` }}
               >
                 {/* Recipe header with emoji */}
                 <div className="p-4 bg-gradient-to-r from-primary/5 to-secondary/5 flex items-center gap-4">
