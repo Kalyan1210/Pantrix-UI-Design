@@ -8,6 +8,7 @@ import { getCurrentUser } from "../lib/auth";
 import { hapticLight, hapticMedium, hapticSuccess, hapticError } from "../lib/haptics";
 import { Skeleton } from "./ui/skeleton-loader";
 import { toast } from "sonner";
+import { getApiUrl } from "../lib/api-config";
 
 interface RecipesScreenProps {
   onBack: () => void;
@@ -81,8 +82,10 @@ export function RecipesScreen({ onBack }: RecipesScreenProps) {
       );
       setExpiringCount(expiring.length);
 
-      // Call the AI recipe API
-      const response = await fetch('/api/generate-recipes', {
+      // Call the AI recipe API using centralized config
+      const apiUrl = getApiUrl('/api/generate-recipes');
+        
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -14,7 +14,9 @@ import { HouseholdScreen } from "./components/HouseholdScreen";
 import { SpoilageAlertsScreen } from "./components/SpoilageAlertsScreen";
 import { RecipesScreen } from "./components/RecipesScreen";
 import { AddItemScreen } from "./components/AddItemScreen";
+import { AddShoppingItemScreen } from "./components/AddShoppingItemScreen";
 import { NotificationsScreen } from "./components/NotificationsScreen";
+import { AnimatedSplashScreen } from "./components/AnimatedSplashScreen";
 import { BottomNav } from "./components/BottomNav";
 import { Toaster } from "./components/ui/sonner";
 import { getCurrentUser, onAuthStateChange } from "./lib/auth";
@@ -22,7 +24,10 @@ import { PageTransition } from "./components/ui/page-transition";
 import { hapticMedium, hapticSuccess } from "./lib/haptics";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Download, X } from "lucide-react";
-// Loader2 removed - using custom emoji animation
+import { Capacitor } from "@capacitor/core";
+import { App as CapacitorApp } from "@capacitor/app";
+import { Browser } from "@capacitor/browser";
+import { supabase } from "./lib/supabase";
 
 type Screen = 
   | 'welcome' 
@@ -39,6 +44,7 @@ type Screen =
   | 'spoilageAlerts'
   | 'recipes'
   | 'addItem'
+  | 'addShoppingItem'
   | 'notifications';
 
 export default function App() {
@@ -75,6 +81,72 @@ export default function App() {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, []);
+
+  // Handle deep links for OAuth on native platforms
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    // Handle deep link when app opens from URL
+    const handleDeepLink = async (url: string) => {
+      console.log('Deep link received:', url);
+      
+      // Check if this is an OAuth callback
+      if (url.includes('auth/callback') || url.includes('access_token') || url.includes('code=')) {
+        try {
+          // Close the browser if it's open
+          await Browser.close();
+          
+          // Extract tokens from URL
+          const urlObj = new URL(url.replace('pantrix://', 'https://'));
+          const hashParams = new URLSearchParams(urlObj.hash.substring(1));
+          const queryParams = urlObj.searchParams;
+          
+          const accessToken = hashParams.get('access_token') || queryParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token');
+          
+          if (accessToken && refreshToken) {
+            // Set the session with the tokens
+            const { error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            
+            if (error) {
+              console.error('Error setting session:', error);
+            } else {
+              console.log('OAuth session set successfully');
+              setIsAuthenticated(true);
+              // Check onboarding
+              const user = await getCurrentUser();
+              if (user) {
+                const hasOnboarding = localStorage.getItem(`onboarding_${user.id}`) === 'completed';
+                setHasCompletedOnboarding(hasOnboarding);
+                setCurrentScreen(hasOnboarding ? 'home' : 'onboarding');
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error handling OAuth callback:', error);
+        }
+      }
+    };
+
+    // Listen for app URL open events
+    CapacitorApp.addListener('appUrlOpen', (event) => {
+      handleDeepLink(event.url);
+    });
+
+    // Check if the app was opened with a URL (cold start)
+    CapacitorApp.getLaunchUrl().then((result) => {
+      if (result?.url) {
+        handleDeepLink(result.url);
+      }
+    });
+
+    return () => {
+      CapacitorApp.removeAllListeners();
+    };
+  }, []);
   
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
@@ -103,12 +175,12 @@ export default function App() {
     const toIndex = mainScreens.indexOf(to);
     
     // Going to sub-screens (detail, add, etc.)
-    if (['itemDetail', 'addItem', 'notifications', 'household', 'spoilageAlerts', 'recipes'].includes(to)) {
+    if (['itemDetail', 'addItem', 'addShoppingItem', 'notifications', 'household', 'spoilageAlerts', 'recipes'].includes(to)) {
       return 'right';
     }
     
     // Coming back from sub-screens
-    if (['itemDetail', 'addItem', 'notifications', 'household', 'spoilageAlerts', 'recipes'].includes(from)) {
+    if (['itemDetail', 'addItem', 'addShoppingItem', 'notifications', 'household', 'spoilageAlerts', 'recipes'].includes(from)) {
       return 'left';
     }
     
@@ -234,6 +306,7 @@ export default function App() {
       case 'household':
       case 'itemDetail':
       case 'addItem':
+      case 'addShoppingItem':
       case 'notifications':
         navigateToScreen(screen as Screen);
         break;
@@ -244,6 +317,8 @@ export default function App() {
     // Simple navigation back logic
     if (currentScreen === 'itemDetail' || currentScreen === 'addItem') {
       navigateToScreen('inventory');
+    } else if (currentScreen === 'addShoppingItem') {
+      navigateToScreen('shopping');
     } else if (currentScreen === 'household') {
       navigateToScreen('settings');
     } else if (currentScreen === 'spoilageAlerts' || currentScreen === 'recipes' || currentScreen === 'notifications') {
@@ -343,6 +418,17 @@ export default function App() {
             />
           </PageTransition>
         );
+      case 'addShoppingItem':
+        return (
+          <PageTransition key={transitionKey} direction="right">
+            <AddShoppingItemScreen
+              onBack={handleBack}
+              onSave={() => {
+                handleBack();
+              }}
+            />
+          </PageTransition>
+        );
       case 'scan':
         return (
           <PageTransition key={transitionKey} direction="bottom">
@@ -355,7 +441,7 @@ export default function App() {
       case 'shopping':
         return (
           <PageTransition key={transitionKey} direction={direction}>
-            <ShoppingListScreen onAddItem={() => handleNavigate('addItem')} />
+            <ShoppingListScreen onAddItem={() => handleNavigate('addShoppingItem')} />
           </PageTransition>
         );
       case 'settings':
@@ -398,96 +484,10 @@ export default function App() {
   };
 
   const showBottomNav = isAuthenticated && 
-    !['welcome', 'login', 'signup', 'onboarding', 'itemDetail', 'household', 'spoilageAlerts', 'recipes', 'addItem', 'notifications'].includes(currentScreen);
+    !['welcome', 'login', 'signup', 'onboarding', 'itemDetail', 'household', 'spoilageAlerts', 'recipes', 'addItem', 'addShoppingItem', 'notifications'].includes(currentScreen);
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center overflow-hidden">
-        <style>{`
-          @keyframes springIn {
-            0% {
-              opacity: 0;
-              transform: scale(0.2) rotate(-180deg);
-            }
-            50% {
-              opacity: 1;
-              transform: scale(1.2) rotate(10deg);
-            }
-            70% {
-              transform: scale(0.9) rotate(-5deg);
-            }
-            100% {
-              opacity: 1;
-              transform: scale(1) rotate(0deg);
-            }
-          }
-          
-          @keyframes gentleSpinPulse {
-            0%, 100% {
-              transform: scale(1) rotate(0deg);
-            }
-            25% {
-              transform: scale(1.08) rotate(5deg);
-            }
-            50% {
-              transform: scale(1.15) rotate(0deg);
-            }
-            75% {
-              transform: scale(1.08) rotate(-5deg);
-            }
-          }
-          
-          @keyframes textSlideUp {
-            0% {
-              opacity: 0;
-              transform: translateY(20px);
-            }
-            100% {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-          
-          @keyframes shimmer {
-            0% {
-              background-position: -200% 0;
-            }
-            100% {
-              background-position: 200% 0;
-            }
-          }
-          
-          .emoji-loading {
-            font-size: 120px;
-            animation: springIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards, 
-                       gentleSpinPulse 2s ease-in-out 0.5s infinite;
-            filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.15));
-          }
-          
-          .text-loading {
-            animation: textSlideUp 0.4s ease-out 0.3s forwards;
-            opacity: 0;
-            background: linear-gradient(90deg, hsl(var(--foreground)) 40%, hsl(var(--primary)) 50%, hsl(var(--foreground)) 60%);
-            background-size: 200% auto;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            animation: textSlideUp 0.4s ease-out 0.3s forwards, shimmer 3s linear 0.7s infinite;
-          }
-          
-          .loader-dot {
-            animation: gentleSpinPulse 1.5s ease-in-out infinite;
-          }
-        `}</style>
-        <div className="flex flex-col items-center">
-          <div className="emoji-loading mb-6">🥗</div>
-          <h1 className="text-4xl font-bold text-loading tracking-tight">Pantrix</h1>
-          <p className="text-muted-foreground mt-3 text-sm" style={{ animation: 'textSlideUp 0.4s ease-out 0.5s forwards', opacity: 0 }}>
-            Your smart pantry companion
-          </p>
-        </div>
-      </div>
-    );
+    return <AnimatedSplashScreen />;
   }
 
   return (

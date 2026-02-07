@@ -28,8 +28,9 @@ export function BottomNav({ activeTab, onTabChange, shoppingListCount = 0 }: Bot
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border shadow-lg z-50 safe-area-bottom">
-      <div className="max-w-md mx-auto flex justify-around items-center px-2">
+    <div className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-xl border-t border-border/50 z-50">
+      {/* Extra padding to lift the nav bar up */}
+      <div className="max-w-md mx-auto flex justify-around items-center px-2 pb-6 pt-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -39,15 +40,21 @@ export function BottomNav({ activeTab, onTabChange, shoppingListCount = 0 }: Bot
             <button
               key={tab.id}
               onClick={() => handleTabClick(tab.id)}
-              className={`flex flex-col items-center justify-center py-3 px-4 min-w-[60px] relative transition-all touch-feedback ${
-                isScan ? 'mt-[-16px]' : ''
+              className={`flex flex-col items-center justify-center py-2 px-4 min-w-[60px] relative transition-all active:scale-95 ${
+                isScan ? 'mt-[-20px]' : ''
               }`}
               aria-label={tab.label}
             >
               {isScan ? (
-                <div className={`w-14 h-14 rounded-full bg-primary shadow-lg flex items-center justify-center mb-1 transition-transform ${
-                  isActive ? 'scale-110' : 'hover:scale-105'
-                }`}>
+                <div className={`w-14 h-14 rounded-full bg-primary shadow-lg flex items-center justify-center transition-all ${
+                  isActive ? 'scale-110 shadow-primary/40' : ''
+                }`}
+                style={{
+                  boxShadow: isActive 
+                    ? '0 4px 20px rgba(34, 197, 94, 0.4)' 
+                    : '0 4px 12px rgba(0, 0, 0, 0.15)'
+                }}
+                >
                   <Icon className="w-6 h-6 text-primary-foreground" />
                 </div>
               ) : (
@@ -58,7 +65,7 @@ export function BottomNav({ activeTab, onTabChange, shoppingListCount = 0 }: Bot
                         isActive ? 'text-primary scale-110' : 'text-muted-foreground'
                       }`}
                     />
-                    {tab.badge && tab.badge > 0 && (
+                    {typeof tab.badge === 'number' && tab.badge > 0 && (
                       <Badge 
                         variant="destructive" 
                         className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs animate-scale-in"
@@ -68,22 +75,20 @@ export function BottomNav({ activeTab, onTabChange, shoppingListCount = 0 }: Bot
                     )}
                   </div>
                   <span
-                    className={`text-xs mt-1 transition-colors duration-200 ${
-                      isActive ? 'text-primary font-medium' : 'text-muted-foreground'
+                    className={`text-[11px] mt-1.5 font-medium transition-colors duration-200 ${
+                      isActive ? 'text-primary' : 'text-muted-foreground'
                     }`}
                   >
                     {tab.label}
                   </span>
-                  {/* Active indicator dot */}
-                  {isActive && (
-                    <div className="absolute bottom-1 w-1 h-1 rounded-full bg-primary animate-scale-in" />
-                  )}
                 </>
               )}
             </button>
           );
         })}
       </div>
+      {/* Safe area padding - separate so nav content is above it */}
+      <div className="safe-area-bottom" />
     </div>
   );
 }

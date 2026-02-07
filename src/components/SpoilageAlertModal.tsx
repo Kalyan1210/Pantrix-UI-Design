@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
 import { updateUserPreferences } from '../lib/preferences';
+import { IOSModal } from './ui/ios-modal';
 
 interface SpoilageAlertModalProps {
   isOpen: boolean;
@@ -21,8 +21,6 @@ export function SpoilageAlertModal({
 }: SpoilageAlertModalProps) {
   const [days, setDays] = useState(currentDays);
   const [isSaving, setIsSaving] = useState(false);
-
-  if (!isOpen) return null;
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -51,19 +49,8 @@ export function SpoilageAlertModal({
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full p-6 relative">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold">Spoilage Alert Settings</h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
+    <IOSModal isOpen={isOpen} onClose={onClose} title="Spoilage Alert Settings">
+      <div className="px-4 py-4">
         {/* Description */}
         <p className="text-muted-foreground mb-6">
           Get notified before items in your inventory are about to expire
@@ -78,7 +65,7 @@ export function SpoilageAlertModal({
               className={`w-full p-4 rounded-lg border-2 transition-all ${
                 days === option.value
                   ? 'border-primary bg-primary/5'
-                  : 'border-gray-200 hover:border-gray-300'
+                  : 'border-border hover:border-muted-foreground/30'
               }`}
             >
               <div className="flex items-center justify-between">
@@ -112,7 +99,6 @@ export function SpoilageAlertModal({
           </Button>
         </div>
       </div>
-    </div>
+    </IOSModal>
   );
 }
-

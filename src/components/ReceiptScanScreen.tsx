@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ArrowLeft, Camera, Upload, Check, X, Plus, Minus, RotateCcw, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, Camera, Check, X, Plus, Minus, RotateCcw, Image as ImageIcon, Aperture } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
@@ -8,9 +8,10 @@ import { Progress } from "./ui/progress";
 import { parseReceipt, parseProduct, analyzeImage } from "../lib/anthropic";
 import { analyzeImageViaProxy } from "../lib/anthropic-proxy";
 import { addMultipleInventoryItems, addInventoryItem } from "../lib/inventory";
-import { captureImageFromVideo, imageFileToBase64, requestCameraPermission } from "../lib/camera";
+import { captureImageFromVideo, imageFileToBase64, requestCameraPermission, takePhoto, pickFromGallery, isNativePlatform } from "../lib/camera";
 import { getCurrentUser } from "../lib/auth";
 import { toast } from "sonner";
+import { hapticMedium, hapticSuccess, hapticError } from "../lib/haptics";
 
 interface ReceiptItem {
   id: string;
@@ -48,9 +49,12 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
-  // Initialize camera
+  // Check if native platform
+  const isNative = isNativePlatform();
+
+  // Initialize camera (web only)
   useEffect(() => {
-    if (scanState === 'camera' && hasPermission === null) {
+    if (scanState === 'camera' && hasPermission === null && !isNative) {
       initializeCamera();
     }
 
@@ -61,9 +65,12 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
         streamRef.current = null;
       }
     };
-  }, [scanState, facingMode]);
+  }, [scanState, facingMode, isNative]);
 
   const initializeCamera = async () => {
+    // Skip web camera for native - use native camera picker
+    if (isNative) return;
+    
     try {
       const hasPermission = await requestCameraPermission();
       setHasPermission(hasPermission);
@@ -104,9 +111,45 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
     await initializeCamera();
   };
 
+  // Native camera capture using Capacitor
+  const handleNativeCapture = async () => {
+    hapticMedium();
+    try {
+      const imageBase64 = await takePhoto('camera');
+      if (imageBase64) {
+        setReceiptImage(`data:image/jpeg;base64,${imageBase64}`);
+        setScanState('processing');
+        await processReceipt(imageBase64);
+      }
+    } catch (err) {
+      console.error('Error capturing image:', err);
+      hapticError();
+      toast.error('Failed to capture image. Please try again.');
+    }
+  };
+
+  // Native gallery picker using Capacitor
+  const handleNativeGallery = async () => {
+    hapticMedium();
+    try {
+      const imageBase64 = await pickFromGallery();
+      if (imageBase64) {
+        setReceiptImage(`data:image/jpeg;base64,${imageBase64}`);
+        setScanState('processing');
+        await processReceipt(imageBase64);
+      }
+    } catch (err) {
+      console.error('Error picking image:', err);
+      hapticError();
+      toast.error('Failed to select image. Please try again.');
+    }
+  };
+
+  // Web camera capture
   const handleCapture = async () => {
     if (!videoRef.current) return;
 
+    hapticMedium();
     try {
       const imageBase64 = await captureImageFromVideo(videoRef.current);
       setReceiptImage(`data:image/jpeg;base64,${imageBase64}`);
@@ -121,10 +164,12 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
       await processReceipt(imageBase64);
     } catch (err) {
       console.error('Error capturing image:', err);
+      hapticError();
       toast.error('Failed to capture image. Please try again.');
     }
   };
 
+  // Web file input handler
   const handleGallerySelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -145,6 +190,7 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
       return;
     }
 
+    hapticMedium();
     try {
       // Show preview
       const reader = new FileReader();
@@ -158,6 +204,7 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
       await processReceipt(imageBase64);
     } catch (err) {
       console.error('Error processing image:', err);
+      hapticError();
       toast.error('Failed to process image. Please try again.');
     }
   };
@@ -315,30 +362,103 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
   // Hidden file input ref for gallery
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Camera Screen - iOS Style
+  // Camera Screen - iOS Native Style
   if (scanState === 'camera') {
+    // On native iOS, show a clean picker UI instead of custom camera
+    if (isNative) {
+      return (
+        <div className="fixed inset-0 bg-gradient-to-b from-gray-900 to-black flex flex-col" style={{ zIndex: 9999 }}>
+          {/* Header */}
+          <div className="safe-area-top" />
+          <div className="flex items-center justify-between px-4 py-4">
+            <button 
+              onClick={onBack}
+              className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-xl flex items-center justify-center active:scale-95 transition-transform"
+            >
+              <X className="w-6 h-6 text-white" />
+            </button>
+            <h1 className="text-white font-semibold text-lg">Scan Item</h1>
+            <div className="w-11" />
+          </div>
+
+          {/* Main Content */}
+          <div className="flex-1 flex flex-col items-center justify-center px-6">
+            {/* Icon */}
+            <div className="w-32 h-32 rounded-full bg-white/10 backdrop-blur-xl flex items-center justify-center mb-8">
+              <Aperture className="w-16 h-16 text-white" />
+            </div>
+
+            {/* Instructions */}
+            <h2 className="text-white text-2xl font-semibold text-center mb-3">
+              Capture Receipt or Product
+            </h2>
+            <p className="text-white/60 text-center text-base mb-12 max-w-xs">
+              Take a photo of your grocery receipt or product label to automatically add items
+            </p>
+
+            {/* Action Buttons - Glassy Style */}
+            <div className="w-full max-w-sm space-y-4">
+              {/* Take Photo Button */}
+              <button
+                onClick={handleNativeCapture}
+                className="w-full py-4 px-6 rounded-2xl bg-white/20 backdrop-blur-xl border border-white/30 flex items-center justify-center gap-3 active:scale-[0.98] transition-all"
+              >
+                <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center">
+                  <Camera className="w-6 h-6 text-gray-900" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="text-white font-semibold text-lg">Take Photo</p>
+                  <p className="text-white/60 text-sm">Use camera to capture</p>
+                </div>
+              </button>
+
+              {/* Choose from Library Button */}
+              <button
+                onClick={handleNativeGallery}
+                className="w-full py-4 px-6 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center gap-3 active:scale-[0.98] transition-all"
+              >
+                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+                  <ImageIcon className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="text-white font-semibold text-lg">Choose from Library</p>
+                  <p className="text-white/60 text-sm">Select existing photo</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom safe area */}
+          <div className="safe-area-bottom pb-8" />
+        </div>
+      );
+    }
+
+    // Web Camera View
     return (
       <div className="fixed inset-0 bg-black flex flex-col" style={{ zIndex: 9999 }}>
         {/* Top Bar */}
-        <div className="relative z-20 flex items-center justify-between px-4 py-3 bg-black/50">
+        <div className="relative z-20 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent">
           <button 
             onClick={onBack}
-            className="w-10 h-10 rounded-full bg-gray-800/80 flex items-center justify-center"
+            className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-xl flex items-center justify-center active:scale-95 transition-transform"
           >
             <X className="w-6 h-6 text-white" />
           </button>
-          <span className="text-white font-medium">PHOTO</span>
-          <div className="w-10" /> {/* Spacer */}
+          <span className="text-white font-semibold">Capture</span>
+          <div className="w-11" />
         </div>
 
         {/* Camera Preview Area */}
         <div className="flex-1 relative bg-black">
           {hasPermission === false || cameraError ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-white">
-              <Camera className="w-20 h-20 mb-6 opacity-50" />
-              <p className="text-center text-lg mb-2">Camera access needed</p>
-              <p className="text-center text-sm text-white/60 mb-6">{cameraError || 'Please allow camera permission'}</p>
-              <Button onClick={initializeCamera} className="bg-white text-black hover:bg-white/90">
+              <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center mb-6">
+                <Camera className="w-12 h-12 text-white/60" />
+              </div>
+              <p className="text-center text-xl font-semibold mb-2">Camera Access Needed</p>
+              <p className="text-center text-sm text-white/60 mb-6 max-w-xs">{cameraError || 'Please allow camera permission to scan items'}</p>
+              <Button onClick={initializeCamera} className="bg-white text-black hover:bg-white/90 rounded-full px-8">
                 Enable Camera
               </Button>
             </div>
@@ -355,8 +475,8 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
               
               {/* Scan hint overlay */}
               <div className="absolute top-4 left-0 right-0 z-10 px-4">
-                <div className="mx-auto bg-black/50 backdrop-blur-sm rounded-full px-4 py-2 w-fit">
-                  <p className="text-white text-center text-sm">
+                <div className="mx-auto bg-black/40 backdrop-blur-xl rounded-full px-5 py-2.5 w-fit border border-white/10">
+                  <p className="text-white text-center text-sm font-medium">
                     📸 Point at receipt or product
                   </p>
                 </div>
@@ -365,12 +485,12 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
           )}
         </div>
 
-        {/* Bottom Controls - iOS Camera Style */}
-        <div className="relative z-20 bg-black px-6 py-8 pb-10">
-          <div className="flex items-center justify-between max-w-sm mx-auto">
-            {/* Gallery Button - Shows thumbnail or icon */}
+        {/* Bottom Controls - Clean iOS Style */}
+        <div className="relative z-20 bg-gradient-to-t from-black via-black/90 to-transparent px-6 pt-6 pb-10">
+          <div className="flex items-center justify-center gap-8 max-w-sm mx-auto">
+            {/* Gallery Button */}
             <label className="cursor-pointer">
-              <div className="w-14 h-14 rounded-xl bg-gray-800 border-2 border-white/30 flex items-center justify-center overflow-hidden hover:border-white/60 transition-colors">
+              <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center active:scale-95 transition-transform">
                 <ImageIcon className="w-7 h-7 text-white" />
               </div>
               <input
@@ -387,29 +507,22 @@ export function ReceiptScanScreen({ onBack, onComplete }: ReceiptScanScreenProps
             <button
               onClick={handleCapture}
               disabled={hasPermission === false || !!cameraError}
-              className="w-[72px] h-[72px] rounded-full bg-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-20 h-20 rounded-full bg-white flex items-center justify-center active:scale-90 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
-                boxShadow: '0 0 0 4px rgba(255,255,255,0.3), 0 4px 20px rgba(0,0,0,0.4)'
+                boxShadow: '0 0 0 4px rgba(255,255,255,0.3), 0 8px 32px rgba(0,0,0,0.5)'
               }}
             >
-              <div className="w-[62px] h-[62px] rounded-full border-[3px] border-black/10" />
+              <div className="w-[68px] h-[68px] rounded-full border-[3px] border-gray-200" />
             </button>
 
             {/* Flip Camera Button */}
             <button
               onClick={flipCamera}
               disabled={hasPermission === false || !!cameraError}
-              className="w-14 h-14 rounded-full bg-gray-800/80 flex items-center justify-center hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <RotateCcw className="w-6 h-6 text-white" />
             </button>
-          </div>
-
-          {/* Mode indicator */}
-          <div className="flex items-center justify-center gap-6 mt-6">
-            <span className="text-white/50 text-sm">VIDEO</span>
-            <span className="text-yellow-400 font-medium text-sm">PHOTO</span>
-            <span className="text-white/50 text-sm">SCAN</span>
           </div>
         </div>
       </div>

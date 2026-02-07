@@ -471,71 +471,94 @@ html {
   }
 }
 
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* Glassmorphism Styles */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-@keyframes slideInBottom {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.glass-light {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+.glass-dark {
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+.glass-button {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  transition: all 0.2s ease;
 }
 
-@keyframes pulse-glow {
-  0%, 100% { opacity: 0.5; transform: scale(1); }
-  50% { opacity: 0.2; transform: scale(1.2); }
+.glass-button:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out forwards;
+.glass-button:active {
+  transform: scale(0.97);
+  background: rgba(255, 255, 255, 0.3);
 }
 
-.animate-slide-in-bottom {
-  animation: slideInBottom 0.3s ease-out forwards;
+.glass-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
-.animate-scale-in {
-  animation: scaleIn 0.2s ease-out forwards;
+.dark .glass-card {
+  background: rgba(30, 30, 30, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Card hover/tap interaction */
-.card-interactive {
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+/* iOS-style button press effect */
+.ios-press {
+  transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
-.card-interactive:active {
-  transform: scale(0.98);
-}
-
-/* Touch feedback */
-.touch-feedback {
-  transition: transform 0.1s ease, opacity 0.1s ease;
-}
-
-.touch-feedback:active {
-  transform: scale(0.95);
+.ios-press:active {
+  transform: scale(0.96);
   opacity: 0.8;
+}
+
+/* Shimmer animation for Pro card (skewed variant) */
+@keyframes shimmer-skewed {
+  0% {
+    transform: translateX(-100%) skewX(-12deg);
+  }
+  100% {
+    transform: translateX(200%) skewX(-12deg);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer-skewed 3s ease-in-out infinite;
+}
+
+/* Slide up animation for modals */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0.8;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards;
 }

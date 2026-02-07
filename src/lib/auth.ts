@@ -1,42 +1,81 @@
 import { supabase } from './supabase';
+import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
+
+// Get the appropriate redirect URL based on platform
+function getRedirectUrl(): string {
+  if (Capacitor.isNativePlatform()) {
+    // Use custom URL scheme for native apps
+    return 'pantrix://auth/callback';
+  }
+  // Use origin for web
+  return `${window.location.origin}`;
+}
 
 // OAuth sign in with Google
 export async function signInWithGoogle() {
+  const redirectTo = getRedirectUrl();
+  
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${window.location.origin}`,
+      redirectTo,
+      skipBrowserRedirect: Capacitor.isNativePlatform(),
     },
   });
 
   if (error) throw error;
+  
+  // On native, open the OAuth URL in the system browser
+  if (Capacitor.isNativePlatform() && data.url) {
+    await Browser.open({ url: data.url });
+  }
+  
   return data;
 }
 
 // OAuth sign in with Microsoft (Azure)
 export async function signInWithMicrosoft() {
+  const redirectTo = getRedirectUrl();
+  
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'azure',
     options: {
-      redirectTo: `${window.location.origin}`,
+      redirectTo,
       scopes: 'email profile openid',
+      skipBrowserRedirect: Capacitor.isNativePlatform(),
     },
   });
 
   if (error) throw error;
+  
+  // On native, open the OAuth URL in the system browser
+  if (Capacitor.isNativePlatform() && data.url) {
+    await Browser.open({ url: data.url });
+  }
+  
   return data;
 }
 
 // OAuth sign in with Apple
 export async function signInWithApple() {
+  const redirectTo = getRedirectUrl();
+  
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'apple',
     options: {
-      redirectTo: `${window.location.origin}`,
+      redirectTo,
+      skipBrowserRedirect: Capacitor.isNativePlatform(),
     },
   });
 
   if (error) throw error;
+  
+  // On native, open the OAuth URL in the system browser
+  if (Capacitor.isNativePlatform() && data.url) {
+    await Browser.open({ url: data.url });
+  }
+  
   return data;
 }
 

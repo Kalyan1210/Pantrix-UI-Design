@@ -88,13 +88,25 @@ export function InventoryScreen({ onItemClick, onAddItem, initialFilter }: Inven
       );
     }
 
-    if (activeFilter === 'expiring') {
+    if (activeFilter === 'expired') {
+      // Only show expired items (days <= 0)
       filtered = filtered.filter(item => {
         const days = calculateDaysUntilExpiry(item.expiry_date);
-        return days !== null && days <= 5;
+        return days !== null && days <= 0;
+      });
+    } else if (activeFilter === 'expiring') {
+      // Only show items expiring soon (1-5 days), NOT expired
+      filtered = filtered.filter(item => {
+        const days = calculateDaysUntilExpiry(item.expiry_date);
+        return days !== null && days > 0 && days <= 5;
       });
     } else if (activeFilter === 'low') {
-      filtered = filtered.filter(item => item.quantity <= 2);
+      // Only show items with low quantity (and not expired to avoid overlap)
+      filtered = filtered.filter(item => {
+        const days = calculateDaysUntilExpiry(item.expiry_date);
+        const isExpired = days !== null && days <= 0;
+        return item.quantity <= 2 && !isExpired;
+      });
     }
 
     // Sort based on selected option
@@ -249,7 +261,7 @@ export function InventoryScreen({ onItemClick, onAddItem, initialFilter }: Inven
           <Button
             variant={activeFilter === 'all' ? 'default' : 'outline'}
             size="sm"
-            className="touch-feedback"
+            className="touch-feedback whitespace-nowrap"
             onClick={() => {
               hapticLight();
               setActiveFilter('all');
@@ -258,9 +270,20 @@ export function InventoryScreen({ onItemClick, onAddItem, initialFilter }: Inven
             All Items
           </Button>
           <Button
+            variant={activeFilter === 'expired' ? 'destructive' : 'outline'}
+            size="sm"
+            className="touch-feedback whitespace-nowrap"
+            onClick={() => {
+              hapticLight();
+              setActiveFilter('expired');
+            }}
+          >
+            Expired
+          </Button>
+          <Button
             variant={activeFilter === 'expiring' ? 'secondary' : 'outline'}
             size="sm"
-            className="touch-feedback"
+            className="touch-feedback whitespace-nowrap"
             onClick={() => {
               hapticLight();
               setActiveFilter('expiring');
@@ -271,7 +294,7 @@ export function InventoryScreen({ onItemClick, onAddItem, initialFilter }: Inven
           <Button
             variant={activeFilter === 'low' ? 'secondary' : 'outline'}
             size="sm"
-            className="touch-feedback"
+            className="touch-feedback whitespace-nowrap"
             onClick={() => {
               hapticLight();
               setActiveFilter('low');

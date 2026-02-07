@@ -8,6 +8,7 @@ import { InventoryItemUI } from "../lib/supabase";
 import { getItemIcon } from "../lib/category-icons";
 import { deleteInventoryItem, updateInventoryItem } from "../lib/inventory";
 import { toast } from "sonner";
+import { addToShoppingList } from "../lib/shopping-list";
 
 interface ItemDetailScreenProps {
   item: InventoryItemUI | null;
@@ -211,7 +212,17 @@ export function ItemDetailScreen({ item, onBack, onDelete, onAddToShoppingList }
           <Button 
             className="w-full" 
             size="lg"
-            onClick={onAddToShoppingList}
+            onClick={() => {
+              addToShoppingList({
+                name: item.name,
+                quantity: 1,
+                category: item.category || 'Other',
+                reason: item.daysUntilExpiry && item.daysUntilExpiry <= 0 ? 'expiring' : 
+                        item.quantity <= 2 ? 'low' : 'manual',
+              });
+              toast.success(`${item.name} added to shopping list`);
+              onAddToShoppingList();
+            }}
           >
             <ShoppingCart className="w-5 h-5 mr-2" />
             Add to Shopping List

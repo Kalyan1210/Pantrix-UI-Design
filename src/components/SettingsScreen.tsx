@@ -1,9 +1,8 @@
-import { ChevronRight, User, Users, Bell, Settings as SettingsIcon, HelpCircle, LogOut, Moon, Sun, Trash2, Info } from "lucide-react";
+import React from "react";
+import { ChevronRight, Users, Bell, Settings as SettingsIcon, HelpCircle, LogOut, Moon, Sun, Info, Sparkles } from "lucide-react";
 import { Card } from "./ui/card";
-import { Switch } from "./ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
-import { Separator } from "./ui/separator";
 import { useState, useEffect } from "react";
 import { getCurrentUser } from "../lib/auth";
 import { signOut } from "../lib/auth";
@@ -11,8 +10,16 @@ import { getUserPreferences, updateUserPreferences } from "../lib/preferences";
 import { ProfileEditModal } from "./ProfileEditModal";
 import { SpoilageAlertModal } from "./SpoilageAlertModal";
 import { SupportModal } from "./SupportModal";
+import { PaywallScreen } from "./PaywallScreen";
+import { NotificationsModal } from "./NotificationsModal";
 import { toast } from "sonner";
 import { hapticLight, hapticMedium, hapticHeavy } from "../lib/haptics";
+import { 
+  SettingsSection, 
+  SettingsRow, 
+  SimpleSettingsRow,
+  SimpleSettingsSwitchRow 
+} from "./ui/settings-components";
 
 interface SettingsScreenProps {
   onNavigateToHousehold: () => void;
@@ -33,6 +40,11 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSpoilageModalOpen, setIsSpoilageModalOpen] = useState(false);
   const [supportModalType, setSupportModalType] = useState<'help' | 'about' | null>(null);
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  
+  // Notification count (in a real app, this would come from state/API)
+  const [notificationCount, setNotificationCount] = useState(2);
 
   useEffect(() => {
     loadUserData();
@@ -98,6 +110,7 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
   };
 
   const handlePushNotificationsChange = async (checked: boolean) => {
+    hapticLight();
     setPushNotifications(checked);
     if (userId) {
       try {
@@ -111,6 +124,7 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
   };
 
   const handleEmailNotificationsChange = async (checked: boolean) => {
+    hapticLight();
     setEmailNotifications(checked);
     if (userId) {
       try {
@@ -135,12 +149,26 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
   return (
     <div className="pb-24 px-4 pt-6 max-w-md mx-auto safe-area-top">
       {/* Header */}
-      <div className="mb-6 animate-fade-in">
+      <div className="mb-6 animate-fade-in flex items-center justify-between">
         <h1 className="text-3xl font-bold">Settings</h1>
+        <button
+          onClick={() => {
+            hapticLight();
+            setIsNotificationsOpen(true);
+          }}
+          className="relative p-2 rounded-full hover:bg-muted/50 transition-colors active:scale-95"
+        >
+          <Bell className="w-6 h-6 text-muted-foreground" />
+          {notificationCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-destructive text-destructive-foreground text-xs font-bold rounded-full flex items-center justify-center px-1">
+              {notificationCount > 9 ? '9+' : notificationCount}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Profile Section */}
-      <Card className="p-4 mb-6 animate-slide-in-bottom card-interactive" style={{ animationDelay: '0.05s' }}>
+      <Card className="p-4 mb-6 animate-slide-in-bottom card-interactive rounded-2xl" style={{ animationDelay: '0.05s' }}>
         <button
           onClick={() => {
             hapticLight();
@@ -162,144 +190,106 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
         </button>
       </Card>
 
-      {/* Household Section */}
-      <div className="mb-6 animate-slide-in-bottom" style={{ animationDelay: '0.1s' }}>
-        <h3 className="mb-3 text-muted-foreground text-sm font-medium">Household</h3>
-        <Card>
+      {/* Upgrade to Pro Section */}
+      <div className="mb-6 animate-slide-in-bottom" style={{ animationDelay: '0.08s' }}>
+        <div className="bg-violet-50 dark:bg-violet-950/30 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles className="w-5 h-5 text-amber-500" />
+            <h3 className="font-bold text-lg text-foreground">Upgrade to Pro</h3>
+          </div>
+          <p className="text-muted-foreground text-sm mb-4">
+            Unlimited AI recipes, smart predictions, and deeper personalization.
+          </p>
           <button
             onClick={() => {
-              hapticLight();
-              onNavigateToHousehold();
+              hapticMedium();
+              setIsPaywallOpen(true);
             }}
-            className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors touch-feedback"
+            className="w-full py-3.5 rounded-xl bg-violet-500 hover:bg-violet-600 text-white font-semibold text-base active:scale-[0.98] transition-all"
           >
-            <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
-              <Users className="w-5 h-5 text-accent" />
-            </div>
-            <div className="flex-1 text-left">
-              <p className="font-medium">My Household</p>
-              <p className="text-muted-foreground text-sm">Manage members</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            See Plans
           </button>
-        </Card>
+        </div>
       </div>
+
+      {/* Household Section */}
+      <SettingsSection title="Household" delay="0.12s">
+        <SettingsRow
+          icon={<Users />}
+          iconColor="teal"
+          label="My Household"
+          description="Manage members"
+          onClick={() => {
+            hapticLight();
+            onNavigateToHousehold();
+          }}
+        />
+      </SettingsSection>
 
       {/* Notifications Section */}
-      <div className="mb-6 animate-slide-in-bottom" style={{ animationDelay: '0.15s' }}>
-        <h3 className="mb-3 text-muted-foreground text-sm font-medium">Notifications</h3>
-        <Card className="divide-y">
-          <div className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Bell className="w-5 h-5 text-muted-foreground" />
-              <div>
-                <p className="font-medium">Push Notifications</p>
-                <p className="text-muted-foreground text-sm">Get alerts for expiring items</p>
-              </div>
-            </div>
-            <Switch
-              checked={pushNotifications}
-              onCheckedChange={(checked) => {
-                hapticLight();
-                handlePushNotificationsChange(checked);
-              }}
-            />
-          </div>
-          <div className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Bell className="w-5 h-5 text-muted-foreground" />
-              <div>
-                <p className="font-medium">Email Notifications</p>
-                <p className="text-muted-foreground text-sm">Weekly summary emails</p>
-              </div>
-            </div>
-            <Switch
-              checked={emailNotifications}
-              onCheckedChange={(checked) => {
-                hapticLight();
-                handleEmailNotificationsChange(checked);
-              }}
-            />
-          </div>
-        </Card>
-      </div>
+      <SettingsSection title="Notifications" delay="0.16s">
+        <SimpleSettingsSwitchRow
+          icon={<Bell />}
+          label="Push Notifications"
+          description="Get alerts for expiring items"
+          checked={pushNotifications}
+          onCheckedChange={handlePushNotificationsChange}
+        />
+        <SimpleSettingsSwitchRow
+          icon={<Bell />}
+          label="Email Notifications"
+          description="Weekly summary emails"
+          checked={emailNotifications}
+          onCheckedChange={handleEmailNotificationsChange}
+        />
+      </SettingsSection>
 
       {/* Preferences Section */}
-      <div className="mb-6 animate-slide-in-bottom" style={{ animationDelay: '0.2s' }}>
-        <h3 className="mb-3 text-muted-foreground text-sm font-medium">Preferences</h3>
-        <Card className="divide-y">
-          <div className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {darkMode ? (
-                <Moon className="w-5 h-5 text-muted-foreground" />
-              ) : (
-                <Sun className="w-5 h-5 text-muted-foreground" />
-              )}
-              <div>
-                <p className="font-medium">Dark Mode</p>
-                <p className="text-muted-foreground text-sm">Toggle app theme</p>
-              </div>
-            </div>
-            <Switch checked={darkMode} onCheckedChange={toggleDarkMode} />
-          </div>
-          <button
-            onClick={() => {
-              hapticLight();
-              setIsSpoilageModalOpen(true);
-            }}
-            className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors touch-feedback"
-          >
-            <SettingsIcon className="w-5 h-5 text-muted-foreground" />
-            <div className="flex-1 text-left">
-              <p className="font-medium">Spoilage Alert Settings</p>
-              <p className="text-muted-foreground text-sm">
-                {spoilageAlertDays} {spoilageAlertDays === 1 ? 'day' : 'days'} advance warning
-              </p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </Card>
-      </div>
+      <SettingsSection title="Preferences" delay="0.2s">
+        <SimpleSettingsSwitchRow
+          icon={darkMode ? <Moon /> : <Sun />}
+          label="Dark Mode"
+          description="Toggle app theme"
+          checked={darkMode}
+          onCheckedChange={toggleDarkMode}
+        />
+        <SimpleSettingsRow
+          icon={<SettingsIcon />}
+          label="Spoilage Alert Settings"
+          description={`${spoilageAlertDays} ${spoilageAlertDays === 1 ? 'day' : 'days'} advance warning`}
+          onClick={() => {
+            hapticLight();
+            setIsSpoilageModalOpen(true);
+          }}
+        />
+      </SettingsSection>
 
       {/* Support Section */}
-      <div className="mb-6 animate-slide-in-bottom" style={{ animationDelay: '0.25s' }}>
-        <h3 className="mb-3 text-muted-foreground text-sm font-medium">Support</h3>
-        <Card className="divide-y">
-          <button
-            onClick={() => {
-              hapticLight();
-              setSupportModalType('help');
-            }}
-            className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors touch-feedback"
-          >
-            <HelpCircle className="w-5 h-5 text-muted-foreground" />
-            <div className="flex-1 text-left">
-              <p className="font-medium">Help & Support</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
-          </button>
-          <button
-            onClick={() => {
-              hapticLight();
-              setSupportModalType('about');
-            }}
-            className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors touch-feedback"
-          >
-            <Info className="w-5 h-5 text-muted-foreground" />
-            <div className="flex-1 text-left">
-              <p className="font-medium">About Pantrix</p>
-              <p className="text-muted-foreground text-sm">Version 1.0.0</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </Card>
-      </div>
+      <SettingsSection title="Support" delay="0.24s">
+        <SimpleSettingsRow
+          icon={<HelpCircle />}
+          label="Help & Support"
+          onClick={() => {
+            hapticLight();
+            setSupportModalType('help');
+          }}
+        />
+        <SimpleSettingsRow
+          icon={<Info />}
+          label="About Pantrix"
+          description="Version 1.0.0"
+          onClick={() => {
+            hapticLight();
+            setSupportModalType('about');
+          }}
+        />
+      </SettingsSection>
 
       {/* Logout */}
-      <div className="animate-slide-in-bottom" style={{ animationDelay: '0.3s' }}>
+      <div className="animate-slide-in-bottom" style={{ animationDelay: '0.28s' }}>
         <Button 
           variant="outline" 
-          className="w-full text-destructive border-destructive/20 hover:bg-destructive/10 touch-feedback"
+          className="w-full text-destructive border-destructive/20 hover:bg-destructive/10 rounded-2xl h-12 active:scale-[0.98] transition-transform"
           onClick={() => {
             hapticHeavy();
             handleSignOut();
@@ -310,8 +300,8 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
         </Button>
         
         {/* Version info */}
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          Pantrix v1.0.0 • Made with 💚
+        <p className="text-center text-xs text-muted-foreground mt-8 mb-4">
+          Pantrix v1.0.0
         </p>
       </div>
 
@@ -340,6 +330,20 @@ export function SettingsScreen({ onNavigateToHousehold }: SettingsScreenProps) {
         onClose={() => setSupportModalType(null)}
         type={supportModalType || 'help'}
       />
+
+      <NotificationsModal
+        isOpen={isNotificationsOpen}
+        onClose={() => {
+          setIsNotificationsOpen(false);
+          // Reset notification count when modal is closed (simulating read)
+          setNotificationCount(0);
+        }}
+      />
+
+      {/* Paywall Screen */}
+      {isPaywallOpen && (
+        <PaywallScreen onClose={() => setIsPaywallOpen(false)} />
+      )}
     </div>
   );
 }
